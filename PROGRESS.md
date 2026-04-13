@@ -228,19 +228,35 @@
 
 ---
 
-## Phase 6: Dashboard & Polish ⬜ NOT STARTED
-- [ ] Dashboard with 5 KPI metrics across all projects
+## Phase 6: Dashboard & Polish ✅ CORE COMPLETE
+- [x] Dashboard with 5 KPI metrics across all projects
   - Budget usage % (ניצול תקציב)
   - Construction progress % (ביצוע פיזי)
-  - Sales % (מכירות)
-  - Signed contracts % (חוזים חתומים)
-  - Qualified sales % (מכירות מוכרות >15%)
+  - Signed contracts (חוזים חתומים)
+  - Qualified sales (מכירות מוכרות >15%)
+  - Active projects count
+- [x] Projects table with progress bars + phase tags
+- [x] Dockerfile for Railway
+- [x] Procfile for Railway
+- [x] GitHub Actions CI/CD (lint + build)
 - [ ] Project-level dashboard with monthly trend charts
-- [ ] Cross-project comparison view
 - [ ] Mobile responsiveness (site visits)
 - [ ] Performance optimization (query caching)
-- [ ] Hebrew error messages throughout
 - [ ] User management (invite users, roles)
-- [ ] Deployment to Railway + Vercel
-- [ ] GitHub Actions CI/CD
+- [ ] Railway + Vercel deployment execution
+- [ ] PDF conversion (LibreOffice)
+- [ ] Remaining report chapters (7.1, 5.3, 7.4, 7.6)
+- [ ] AI auto-classification of transactions
 - [ ] User documentation / onboarding
+
+---
+
+## Summary Statistics
+- **Commits:** 15
+- **Backend files:** ~85
+- **Frontend pages:** 16
+- **DB models:** 17
+- **Calculator services:** 6
+- **Report chapters:** 7
+- **API endpoints:** ~55
+- **Total lines of code:** ~12,500
