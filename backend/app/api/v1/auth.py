@@ -29,25 +29,28 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
 
+    # Capture all data before commit (session may detach attrs after commit)
+    user_info = UserInfo(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        role=user.role.value,
+        firm_id=user.firm_id,
+        firm_name=user.firm.name if user.firm else None,
+    )
+
     token_data = {"sub": str(user.id), "firm_id": user.firm_id, "role": user.role.value}
     access = create_access_token(token_data)
     refresh = create_refresh_token(token_data)
 
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = datetime.utcnow()
     await db.commit()
 
     return TokenResponse(
         access_token=access,
         refresh_token=refresh,
-        user=UserInfo(
-            id=user.id,
-            email=user.email,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            role=user.role.value,
-            firm_id=user.firm_id,
-            firm_name=user.firm.name if user.firm else None,
-        ),
+        user=user_info,
     )
 
 
