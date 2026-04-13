@@ -1,0 +1,145 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+import api from "@/lib/api";
+
+const BANKS = [
+  { value: "leumi", label: "בנק לאומי" },
+  { value: "hapoalim", label: "בנק הפועלים" },
+  { value: "discount", label: "בנק דיסקונט" },
+  { value: "mizrahi", label: "בנק מזרחי טפחות" },
+  { value: "international", label: "הבנק הבינלאומי" },
+  { value: "jerusalem", label: "בנק ירושלים" },
+  { value: "other", label: "אחר" },
+];
+
+const PROJECT_TYPES = [
+  { value: "pinui_binui", label: "פינוי בינוי" },
+  { value: "land", label: "רכישת קרקע" },
+  { value: "combination", label: "קומבינציה" },
+  { value: "tama38", label: 'תמ"א 38' },
+  { value: "other", label: "אחר" },
+];
+
+export default function NewProjectPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    project_name: "",
+    address: "",
+    city: "",
+    developer_name: "",
+    bank: "",
+    project_account_number: "",
+    project_type: "",
+  });
+
+  const set = (field: string, value: string) => setForm((p) => ({ ...p, [field]: value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.project_name.trim()) {
+      setError("שם הפרויקט הוא שדה חובה");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await api.post("/projects", form);
+      router.push(`/projects/${data.id}`);
+    } catch {
+      setError("שגיאה ביצירת הפרויקט");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Back */}
+      <button
+        onClick={() => router.back()}
+        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition"
+      >
+        <ArrowRight size={18} />
+        חזרה
+      </button>
+
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">פרויקט חדש</h1>
+      <p className="text-gray-500 mb-8">הזן את הפרטים הבסיסיים. שאר הנתונים יוזנו בשלב ההגדרה.</p>
+
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
+        {error && (
+          <div className="p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
+        )}
+
+        <Field label="שם הפרויקט *" value={form.project_name} onChange={(v) => set("project_name", v)} placeholder='לדוגמה: רש"י 12 רמת גן' />
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="כתובת" value={form.address} onChange={(v) => set("address", v)} placeholder={"רח' רש\"י 12"} />
+          <Field label="עיר" value={form.city} onChange={(v) => set("city", v)} placeholder="רמת גן" />
+        </div>
+        <Field label="שם היזם" value={form.developer_name} onChange={(v) => set("developer_name", v)} placeholder='נווה שוסטר בע"מ' />
+
+        <div className="grid grid-cols-2 gap-4">
+          <SelectField label="סוג פרויקט" value={form.project_type} onChange={(v) => set("project_type", v)} options={PROJECT_TYPES} />
+          <SelectField label="בנק מלווה" value={form.bank} onChange={(v) => set("bank", v)} options={BANKS} />
+        </div>
+
+        <Field label="מספר חשבון" value={form.project_account_number} onChange={(v) => set("project_account_number", v)} placeholder="767-220100/80" dir="ltr" />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-dark transition disabled:opacity-50"
+        >
+          {loading ? "יוצר פרויקט..." : "צור פרויקט"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function Field({
+  label, value, onChange, placeholder, dir,
+}: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; dir?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        dir={dir}
+        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+      />
+    </div>
+  );
+}
+
+function SelectField({
+  label, value, onChange, options,
+}: {
+  label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[];
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+      >
+        <option value="">בחר...</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
