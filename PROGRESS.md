@@ -58,13 +58,13 @@
 ---
 
 ## Phase 2: Project Setup (Weeks 4-6)
-- [ ] Budget upload (Excel parser) + manual entry UI
-- [ ] Apartment inventory CRUD + Excel import
-- [ ] Financing terms form
-- [ ] Contractor agreement form
-- [ ] Milestones timeline
-- [ ] Setup completion progress indicator
-- [ ] Form validation on all setup pages
+- [x] Budget upload (Excel parser) + manual entry UI
+- [x] Apartment inventory CRUD + Excel import
+- [x] Financing terms form
+- [x] Contractor agreement form
+- [x] Milestones timeline
+- [x] Setup completion progress indicator
+- [x] Form validation on all setup pages
 
 ## Phase 3: Monthly Loop - Data Entry (Weeks 7-10)
 - [ ] Monthly report creation with carry-forward service
