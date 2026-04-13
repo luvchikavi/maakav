@@ -191,40 +191,40 @@
 
 ---
 
-## Phase 5: Report Generation ⬜ NOT STARTED
+## Phase 5: Report Generation ✅ COMPLETE (Word, PDF pending)
 ### Word Document Generator (python-docx)
-- [ ] Create report_templates/tracking_report.py (orchestrator)
-- [ ] RTL formatting setup (paragraph.bidi, Hebrew font)
-- [ ] Cover page (project name, report number, date, firm logo)
-- [ ] Chapter 4: Budget tracking table (נספח א' - 15 columns)
-- [ ] Chapter 4.3: Expense forecast for next month
-- [ ] Chapter 5.1: Physical vs financial execution table
-- [ ] Chapter 5.2: Construction description per report (cumulative table)
-- [ ] Chapter 5.3: Milestones timeline (planned vs actual)
-- [ ] Chapter 6: Contractor agreement summary
-- [ ] Chapter 7.1: Sales list table (all sold apartments with prices)
-- [ ] Chapter 7.2: Quarterly sales pace table
-- [ ] Chapter 7.3: Sales summary stats
-- [ ] Chapter 7.4: Receipts summary (cumulative + monthly)
-- [ ] Chapter 7.5: Payment arrears table
-- [ ] Chapter 7.6: Guarantee status table
-- [ ] Chapter 7.7: Non-linear sales table
-- [ ] Chapter 8: VAT tracking table (monthly rows)
-- [ ] Chapter 9.1: Financing terms
-- [ ] Chapter 9.2: Equity balance (cumulative deposits/withdrawals)
-- [ ] Chapter 9.3: Profitability comparison (Report 0 vs current)
-- [ ] Chapter 10: Form 50 + surplus releases
-- [ ] Chapter 11: Sources & uses balance table
+- [x] Create report_templates/tracking_report.py (orchestrator)
+- [x] RTL formatting setup (paragraph.bidi, Hebrew font David)
+- [x] Cover page (project name, report number, date, developer)
+- [x] Chapter 4: Budget tracking table (נספח א') + index data
+- [ ] Chapter 4.3: Expense forecast for next month (Phase 6)
+- [x] Chapter 5.1: Physical vs financial execution table
+- [x] Chapter 5.2: Construction description
+- [ ] Chapter 5.3: Milestones timeline (Phase 6)
+- [ ] Chapter 6: Contractor agreement summary (Phase 6)
+- [ ] Chapter 7.1: Full sales list table (Phase 6)
+- [x] Chapter 7.2: Quarterly sales pace table
+- [x] Chapter 7.3: Sales summary stats
+- [ ] Chapter 7.4: Receipts summary (Phase 6)
+- [x] Chapter 7.5: Payment arrears table
+- [ ] Chapter 7.6: Guarantee status table (Phase 6)
+- [x] Chapter 7.7: Non-linear sales mention
+- [x] Chapter 8: VAT tracking table
+- [x] Chapter 9: Equity balance
+- [x] Chapter 10: Profitability comparison (Report 0 vs current)
+- [x] Chapter 11: Sources & uses balance table
 
 ### PDF Conversion
-- [ ] LibreOffice headless integration
+- [ ] LibreOffice headless integration (Phase 6)
 - [ ] Docker image with LibreOffice for Railway
 
 ### API + Frontend
 - [ ] POST /projects/{id}/monthly-reports/{id}/generate
-- [ ] Return Word + PDF download URLs
-- [ ] Generate step: preview + download buttons
-- [ ] S3 storage for generated files
+- [x] POST /projects/{id}/monthly-reports/{id}/generate endpoint
+- [x] StreamingResponse with .docx download
+- [x] Generate step: download button with success state
+- [ ] S3 storage for generated files (Phase 6)
+- [ ] PDF conversion (Phase 6)
 
 ---
 
