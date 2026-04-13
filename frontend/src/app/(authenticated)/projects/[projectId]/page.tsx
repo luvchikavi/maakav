@@ -203,14 +203,22 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      {/* Monthly Reports Section (placeholder for Phase 3) */}
-      {completedCount >= 3 && (
-        <div className="mt-8 bg-white rounded-2xl border border-gray-200 p-8 text-center">
-          <FileSpreadsheet size={48} className="mx-auto text-gray-300 mb-3" />
-          <h3 className="font-bold text-gray-900 mb-1">דוחות מעקב חודשיים</h3>
-          <p className="text-gray-500 text-sm">לאחר השלמת ההגדרה, ניתן יהיה להתחיל מעקב חודשי</p>
-        </div>
-      )}
+      {/* Monthly Reports Section */}
+      <div className="mt-8">
+        <Link
+          href={`/projects/${projectId}/monthly`}
+          className="block bg-white rounded-2xl border-2 border-primary/20 hover:border-primary/50 p-8 text-center transition group"
+        >
+          <FileSpreadsheet size={48} className="mx-auto text-primary/60 group-hover:text-primary mb-3 transition" />
+          <h3 className="font-bold text-gray-900 mb-1 text-lg">דוחות מעקב חודשיים</h3>
+          <p className="text-gray-500 text-sm">
+            {project.current_report_number > 0
+              ? `${project.current_report_number} דוחות | לחץ לצפייה ויצירת דוח חדש`
+              : "לחץ ליצירת דוח מעקב ראשון"
+            }
+          </p>
+        </Link>
+      </div>
     </div>
   );
 }
