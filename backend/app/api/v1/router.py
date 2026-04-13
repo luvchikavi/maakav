@@ -11,6 +11,7 @@ from .monthly.bank_statements import router as bank_router
 from .monthly.construction import router as construction_router
 from .monthly.sales import router as sales_router
 from .monthly.calculations import router as calculations_router
+from .monthly.generation import router as generation_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -31,3 +32,4 @@ api_router.include_router(bank_router)
 api_router.include_router(construction_router)
 api_router.include_router(sales_router)
 api_router.include_router(calculations_router)
+api_router.include_router(generation_router)
