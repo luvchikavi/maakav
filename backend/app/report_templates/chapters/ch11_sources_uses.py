@@ -1,6 +1,6 @@
 """Chapter 11 - Sources & Uses (מקורות ושימושים)."""
 
-from ..tracking_report import add_rtl_heading, create_rtl_table, format_currency
+from ..utils import add_rtl_heading, create_rtl_table, format_currency
 
 
 def add_chapter_11(doc, su_data: dict):

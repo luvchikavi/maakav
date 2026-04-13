@@ -1,6 +1,6 @@
 """Chapter 10 - Profitability (רווחיות)."""
 
-from ..tracking_report import add_rtl_heading, create_rtl_table, format_currency, format_percent
+from ..utils import add_rtl_heading, create_rtl_table, format_currency, format_percent
 
 
 def add_chapter_10(doc, prof_data: dict):

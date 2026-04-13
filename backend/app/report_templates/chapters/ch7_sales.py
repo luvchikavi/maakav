@@ -1,6 +1,6 @@
 """Chapter 7 - Sales (הכנסות / מכירות)."""
 
-from ..tracking_report import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
+from ..utils import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
 
 
 def add_chapter_7(doc, sales_data: dict):

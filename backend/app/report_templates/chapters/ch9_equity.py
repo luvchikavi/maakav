@@ -1,6 +1,6 @@
 """Chapter 9 - Equity (הון עצמי)."""
 
-from ..tracking_report import add_rtl_heading, create_rtl_table, format_currency
+from ..utils import add_rtl_heading, create_rtl_table, format_currency
 
 
 def add_chapter_9(doc, equity_data: dict):

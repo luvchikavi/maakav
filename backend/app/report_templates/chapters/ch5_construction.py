@@ -1,6 +1,6 @@
 """Chapter 5 - Construction Progress (התקדמות פיזית)."""
 
-from ..tracking_report import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
+from ..utils import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
 
 
 def add_chapter_5(doc, construction_data: dict, budget_data: dict | None = None):

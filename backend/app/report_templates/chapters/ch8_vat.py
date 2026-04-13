@@ -1,6 +1,6 @@
 """Chapter 8 - VAT Tracking (מעקב מע"מ)."""
 
-from ..tracking_report import add_rtl_heading, create_rtl_table, format_currency
+from ..utils import add_rtl_heading, create_rtl_table, format_currency
 
 
 def add_chapter_8(doc, vat_data: dict):

@@ -1,6 +1,6 @@
 """Chapter 4 - Budget Tracking (תקציב הפרויקט / נספח א')."""
 
-from ..tracking_report import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
+from ..utils import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
 
 CATEGORY_LABELS = {
     "tenant_expenses": "קרקע והוצאות דיירים",
