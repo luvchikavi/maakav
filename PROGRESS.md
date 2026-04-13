@@ -126,70 +126,68 @@
 
 ---
 
-## Phase 4: Calculations Engine ⬜ IN PROGRESS
+## Phase 4: Calculations Engine ✅ COMPLETE
 ### Budget Calculator Service
-- [ ] Create services/budget_calculator.py
-- [ ] Wire calculate_all to bank transactions per category
-- [ ] Auto-populate K column (monthly_paid_actual) from classified transactions
-- [ ] Carry-forward F, J columns from previous month snapshot
-- [ ] POST /projects/{id}/monthly-reports/{id}/calculate endpoint
-- [ ] Return full נספח א' table data
+- [x] Create services/budget_calculator.py
+- [x] Wire calculate_all to bank transactions per category
+- [x] Auto-populate K column (monthly_paid_actual) from classified transactions
+- [x] Carry-forward F, J columns from previous month snapshot
+- [x] POST /projects/{id}/monthly-reports/{id}/calculate endpoint
+- [x] Return full נספח א' table data
 
 ### Sales Calculator Service
-- [ ] Create services/sales_calculator.py
-- [ ] Qualified sales count (תקבולים >15% ממחיר)
-- [ ] Quarterly sales pace (קצב מכירות רבעוני)
-- [ ] Non-linear sales detection (תקבול אחרון >40%)
-- [ ] Payment arrears (פיגורי רוכשים)
-- [ ] Sales vs Report 0 comparison (הפרש מחירים)
+- [x] Create services/sales_calculator.py
+- [x] Qualified sales count (תקבולים >15% ממחיר)
+- [x] Quarterly sales pace (קצב מכירות רבעוני)
+- [x] Non-linear sales detection (תקבול אחרון >40%)
+- [x] Payment arrears (פיגורי רוכשים)
+- [x] Sales vs Report 0 comparison (הפרש מחירים)
 
 ### VAT Calculator Service
-- [ ] Create services/vat_calculator.py
-- [ ] Monthly: transactions (income) → output VAT
-- [ ] Monthly: inputs (expenses) → input VAT
-- [ ] Balance: input - output
-- [ ] Cumulative tracking
+- [x] Create services/vat_calculator.py
+- [x] Monthly: transactions (income) → output VAT
+- [x] Monthly: inputs (expenses) → input VAT
+- [x] Balance: input - output
+- [x] Cumulative tracking
 
 ### Equity Calculator Service
-- [ ] Create services/equity_calculator.py
-- [ ] Extract equity deposits/withdrawals from bank transactions
-- [ ] Calculate cumulative balance
-- [ ] Compare to required amount → gap
+- [x] Create services/equity_calculator.py
+- [x] Extract equity deposits/withdrawals from bank transactions
+- [x] Calculate cumulative balance
+- [x] Compare to required amount → gap
 
 ### Profitability Calculator Service
-- [ ] Create services/profitability_calculator.py
-- [ ] Income: receipts + inventory value
-- [ ] Costs: from budget tracking (נספח א')
-- [ ] Profit = income - costs
-- [ ] Comparison to Report 0
+- [x] Create services/profitability_calculator.py
+- [x] Income: receipts + inventory value
+- [x] Costs: from budget tracking (נספח א')
+- [x] Profit = income - costs
+- [x] Comparison to Report 0
 
 ### Sources & Uses Calculator Service
-- [ ] Create services/sources_uses_calculator.py
-- [ ] Sources: equity, sales receipts, bank credit, VAT refunds
-- [ ] Uses: payments (from budget), surplus releases
-- [ ] Balance must equal zero
+- [x] Create services/sources_uses_calculator.py
+- [x] Sources: equity, sales receipts, bank credit, VAT refunds
+- [x] Uses: payments (from budget), surplus releases
+- [x] Balance calculation
 
 ### Guarantee Calculator Service
-- [ ] Create services/guarantee_calculator.py
+- [ ] Create services/guarantee_calculator.py (Phase 5)
 - [ ] Guarantee balance vs receipts comparison
-- [ ] Gap calculation
 
 ### AI Auto-Classification Service
-- [ ] Create services/transaction_classifier.py
+- [ ] Create services/transaction_classifier.py (Phase 6)
 - [ ] Claude API with category taxonomy + project context
-- [ ] Suggest category for each unclassified transaction
 
 ### Anomaly Detection
-- [ ] Budget overrun alerts (>100% on any category)
+- [ ] Budget overrun alerts (Phase 6)
 - [ ] Unusual transaction amounts
 - [ ] Physical vs financial execution gap alerts
 
 ### Frontend - Review Step Enhancement
-- [ ] Show נספח א' table in review step
-- [ ] Show sales summary in review
-- [ ] Show VAT balance
-- [ ] Show equity status
-- [ ] Show profitability comparison
+- [x] Show נספח א' table in review step
+- [x] Show sales summary in review
+- [x] Show VAT balance
+- [x] Show equity status
+- [x] Show profitability comparison (Report 0 vs current)
 
 ---
 
