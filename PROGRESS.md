@@ -37,14 +37,14 @@
 - [x] SourcesUses (sources vs uses balance)
 
 ### Frontend Scaffold
-- [ ] Next.js 15 project initialization
-- [ ] Tailwind CSS + RTL setup
-- [ ] Hebrew font (Heebo)
-- [ ] Auth pages (login)
-- [ ] Dashboard layout (sidebar, header)
-- [ ] API client with JWT refresh
-- [ ] Project list page
-- [ ] Project creation page
+- [x] Next.js 15 project initialization
+- [x] Tailwind CSS + RTL setup
+- [x] Hebrew font (Heebo)
+- [x] Auth pages (login)
+- [x] Dashboard layout (sidebar, header)
+- [x] API client with JWT refresh
+- [x] Project list page
+- [x] Project creation page
 
 ### DevOps
 - [x] Git repo initialized
