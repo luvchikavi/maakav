@@ -67,15 +67,16 @@
 - [x] Form validation on all setup pages
 
 ## Phase 3: Monthly Loop - Data Entry (Weeks 7-10)
-- [ ] Monthly report creation with carry-forward service
-- [ ] Bank statement PDF upload + AI parsing (port from Nectra)
-- [ ] Transaction review & classification UI
-- [ ] AI auto-classification service
-- [ ] Sales entry/update with payment schedule
-- [ ] Construction progress entry (% + description + photos)
-- [ ] Index update (מדד תשומות)
-- [ ] Guarantee upload
-- [ ] 7-step wizard navigation in frontend
+- [x] Monthly report creation with carry-forward service
+- [x] Bank statement PDF upload + AI parsing (port from Nectra)
+- [x] Transaction review & classification UI
+- [ ] AI auto-classification service (Phase 4)
+- [x] Sales summary view
+- [x] Construction progress entry (% + description)
+- [x] Index update (מדד תשומות)
+- [x] Guarantee upload (placeholder)
+- [x] 7-step wizard navigation in frontend
+- [x] Data completeness checker with missing items list
 
 ## Phase 4: Calculations Engine (Weeks 11-13)
 - [ ] Budget calculator (calculate_all - already in model)
