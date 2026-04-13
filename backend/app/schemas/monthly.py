@@ -1,0 +1,123 @@
+"""Schemas for monthly tracking workflow."""
+
+from datetime import date, datetime
+from decimal import Decimal
+from pydantic import BaseModel
+
+
+# === Monthly Report ===
+
+class MonthlyReportCreate(BaseModel):
+    report_month: date  # First day of month
+    current_index: Decimal | None = None
+    vat_rate: Decimal = Decimal("0.18")
+
+
+class MonthlyReportResponse(BaseModel):
+    id: int
+    project_id: int
+    report_month: date
+    report_number: int
+    status: str
+    current_index: Decimal | None
+    vat_rate: Decimal
+    data_completeness: dict | None
+    generated_word_url: str | None
+    generated_pdf_url: str | None
+    generated_at: datetime | None
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# === Bank Statement ===
+
+class BankStatementResponse(BaseModel):
+    id: int
+    account_type: str
+    original_filename: str | None
+    bank_name: str | None
+    account_number: str | None
+    statement_start_date: date | None
+    statement_end_date: date | None
+    opening_balance: Decimal | None
+    closing_balance: Decimal | None
+    parsing_status: str
+    ai_warnings: list | None
+    transactions_count: int = 0
+    model_config = {"from_attributes": True}
+
+
+class BankTransactionResponse(BaseModel):
+    id: int
+    transaction_date: date
+    description: str
+    amount: Decimal
+    balance: Decimal | None
+    transaction_type: str
+    category: str | None
+    ai_suggested_category: str | None
+    ai_confidence: Decimal | None
+    is_manually_classified: bool
+    reference_number: str | None
+    notes: str | None
+    model_config = {"from_attributes": True}
+
+
+class TransactionClassifyRequest(BaseModel):
+    category: str
+    notes: str | None = None
+    linked_apartment_id: int | None = None
+
+
+# === Construction Progress ===
+
+class ConstructionProgressUpdate(BaseModel):
+    overall_percent: Decimal
+    description_text: str | None = None
+    visit_date: datetime | None = None
+    visitor_name: str | None = None
+
+
+class ConstructionProgressResponse(BaseModel):
+    id: int
+    overall_percent: Decimal
+    monthly_delta_percent: Decimal
+    description_text: str | None
+    visit_date: datetime | None
+    visitor_name: str | None
+    model_config = {"from_attributes": True}
+
+
+# === Sales ===
+
+class SalesContractCreate(BaseModel):
+    apartment_id: int
+    buyer_name: str
+    contract_date: date
+    final_price_with_vat: Decimal
+    final_price_no_vat: Decimal
+    notes: str | None = None
+
+
+class SalesContractResponse(BaseModel):
+    id: int
+    apartment_id: int
+    buyer_name: str
+    contract_date: date
+    final_price_with_vat: Decimal
+    final_price_no_vat: Decimal
+    is_recognized_by_bank: bool
+    model_config = {"from_attributes": True}
+
+
+# === Data Completeness ===
+
+class DataCompleteness(BaseModel):
+    bank_statement_uploaded: bool = False
+    all_transactions_classified: bool = False
+    construction_progress_entered: bool = False
+    index_updated: bool = False
+    sales_updated: bool = True  # Optional - only if new sales
+    guarantees_uploaded: bool = False
+    ready_to_generate: bool = False
+    missing_items: list[str] = []
