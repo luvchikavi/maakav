@@ -10,7 +10,7 @@ class Base(DeclarativeBase):
 
 
 engine = create_async_engine(
-    get_settings().DATABASE_URL,
+    get_settings().async_database_url,
     echo=get_settings().DEBUG,
     pool_size=10,
     max_overflow=20,
