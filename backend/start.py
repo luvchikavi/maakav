@@ -7,11 +7,19 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
+# Import all models at module level so tables are registered
+from app.database import engine, Base
+from app.models import (  # noqa
+    Firm, User, Project, ProjectFinancing, ContractorAgreement, Milestone,
+    BudgetCategory, BudgetLineItem, Apartment, SalesContract, PaymentScheduleItem,
+    MonthlyReport, BankStatement, BankTransaction, BudgetTrackingSnapshot,
+    BudgetTrackingLine, ConstructionProgress, VatTracking, EquityTracking,
+    GuaranteeSnapshot, ProfitabilitySnapshot, SourcesUses, PaymentApproval,
+)
+
 
 async def init_db():
     """Create all tables if they don't exist."""
-    from app.database import engine, Base
-    from app.models import *  # noqa - register all models
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
