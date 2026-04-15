@@ -1,6 +1,10 @@
 import axios from "axios";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Force HTTPS for non-localhost URLs (prevents Railway 302 redirects on preflight)
+const API_BASE = /^http:\/\/(?!localhost)/.test(rawBase)
+  ? rawBase.replace("http://", "https://")
+  : rawBase;
 
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
