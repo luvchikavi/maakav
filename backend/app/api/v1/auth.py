@@ -24,10 +24,10 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="פרטי התחברות שגויים")
 
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="החשבון מושבת")
 
     # Capture all data before commit (session may detach attrs after commit)
     user_info = UserInfo(
@@ -58,7 +58,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     payload = decode_token(body.refresh_token)
     if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="טוקן רענון לא תקין")
 
     user_id = payload.get("sub")
     result = await db.execute(
@@ -66,7 +66,7 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
     )
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="המשתמש לא נמצא")
 
     token_data = {"sub": str(user.id), "firm_id": user.firm_id, "role": user.role.value}
     access = create_access_token(token_data)

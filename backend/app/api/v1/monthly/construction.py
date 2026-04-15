@@ -84,4 +84,4 @@ async def save_construction(
 async def _verify(project_id: int, firm_id: int, db: AsyncSession):
     result = await db.execute(select(Project).where(Project.id == project_id, Project.firm_id == firm_id))
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")

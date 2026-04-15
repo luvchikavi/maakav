@@ -41,6 +41,11 @@ class MonthlyReport(Base):
     generated_pdf_url: Mapped[str | None] = mapped_column(String(500))
     generated_at: Mapped[datetime | None] = mapped_column(DateTime)
 
+    # Form 50 + Surplus release (פרק 10)
+    form_50_number: Mapped[str | None] = mapped_column(String(50))
+    form_50_valid_until: Mapped[date | None] = mapped_column(Date)
+    surplus_release_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))  # שחרור עודפים
+
     notes: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

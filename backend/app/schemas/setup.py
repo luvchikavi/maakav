@@ -85,6 +85,10 @@ class ApartmentResponse(BaseModel):
     list_price_with_vat: Decimal | None
     list_price_no_vat: Decimal | None
     report_0_price_no_vat: Decimal | None
+    owner_name: str | None = None
+    gross_area_sqm: Decimal | None = None
+    gallery_area_sqm: Decimal | None = None
+    secondary_type: str | None = None
     include_in_revenue: bool
     model_config = {"from_attributes": True}
 

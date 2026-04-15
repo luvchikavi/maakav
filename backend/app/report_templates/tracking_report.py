@@ -42,15 +42,20 @@ def generate_tracking_report(
         doc.add_page_break()
 
     if "construction" in calc_results:
-        add_chapter_5(doc, calc_results["construction"], calc_results.get("budget_tracking"))
+        add_chapter_5(
+            doc,
+            calc_results["construction"],
+            calc_results.get("budget_tracking"),
+            calc_results.get("milestones"),
+        )
         doc.add_page_break()
 
     if "sales" in calc_results:
-        add_chapter_7(doc, calc_results["sales"])
+        add_chapter_7(doc, calc_results["sales"], calc_results.get("guarantees"))
         doc.add_page_break()
 
     if "vat" in calc_results:
-        add_chapter_8(doc, calc_results["vat"])
+        add_chapter_8(doc, calc_results["vat"], calc_results.get("vat_history"))
 
     if "equity" in calc_results:
         add_chapter_9(doc, calc_results["equity"])
@@ -61,6 +66,20 @@ def generate_tracking_report(
 
     if "sources_uses" in calc_results:
         add_chapter_11(doc, calc_results["sources_uses"])
+
+    # Chapter 10b: Form 50 + Surplus release
+    form_50 = calc_results.get("form_50", {})
+    if form_50 and (form_50.get("form_50_number") or form_50.get("surplus_release_amount")):
+        doc.add_page_break()
+        add_rtl_heading(doc, "פרק 10 - טופס 50 ושחרור עודפים", level=1)
+        if form_50.get("form_50_number"):
+            add_rtl_paragraph(doc, f'טופס 50 מספר: {form_50["form_50_number"]}')
+            if form_50.get("form_50_valid_until"):
+                add_rtl_paragraph(doc, f'תוקף עד: {form_50["form_50_valid_until"]}')
+        if form_50.get("surplus_release_amount"):
+            from .utils import format_currency as fc
+            add_rtl_heading(doc, "שחרור עודפים:", level=2)
+            add_rtl_paragraph(doc, f'סכום שחרור עודפים: {fc(float(form_50["surplus_release_amount"]))}')
 
     buffer = io.BytesIO()
     doc.save(buffer)

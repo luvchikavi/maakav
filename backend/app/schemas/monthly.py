@@ -93,7 +93,9 @@ class ConstructionProgressResponse(BaseModel):
 class SalesContractCreate(BaseModel):
     apartment_id: int
     buyer_name: str
+    buyer_id_number: str | None = None
     contract_date: date
+    original_price_with_vat: Decimal | None = None
     final_price_with_vat: Decimal
     final_price_no_vat: Decimal
     notes: str | None = None
@@ -103,10 +105,54 @@ class SalesContractResponse(BaseModel):
     id: int
     apartment_id: int
     buyer_name: str
+    buyer_id_number: str | None
     contract_date: date
+    original_price_with_vat: Decimal | None
     final_price_with_vat: Decimal
     final_price_no_vat: Decimal
     is_recognized_by_bank: bool
+    is_non_linear: bool
+    notes: str | None
+    model_config = {"from_attributes": True}
+
+
+# === Payment Schedule ===
+
+class PaymentScheduleItemCreate(BaseModel):
+    payment_number: int = 1
+    description: str | None = None
+    scheduled_amount: Decimal
+    scheduled_date: date
+    actual_amount: Decimal | None = None
+    actual_date: date | None = None
+    status: str = "scheduled"
+    reference_number: str | None = None
+    notes: str | None = None
+
+
+class PaymentScheduleItemUpdate(BaseModel):
+    description: str | None = None
+    scheduled_amount: Decimal | None = None
+    scheduled_date: date | None = None
+    actual_amount: Decimal | None = None
+    actual_date: date | None = None
+    status: str | None = None
+    reference_number: str | None = None
+    notes: str | None = None
+
+
+class PaymentScheduleItemResponse(BaseModel):
+    id: int
+    contract_id: int
+    payment_number: int
+    description: str | None
+    scheduled_amount: Decimal
+    scheduled_date: date
+    actual_amount: Decimal | None
+    actual_date: date | None
+    status: str
+    reference_number: str | None
+    notes: str | None
     model_config = {"from_attributes": True}
 
 

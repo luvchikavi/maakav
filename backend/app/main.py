@@ -1,5 +1,8 @@
 """Maakav API - Construction Project Tracking for Appraisal Firms."""
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import traceback
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse

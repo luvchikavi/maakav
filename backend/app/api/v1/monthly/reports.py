@@ -94,7 +94,7 @@ async def get_report(
     )
     report = result.scalar_one_or_none()
     if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise HTTPException(status_code=404, detail="הדוח לא נמצא")
     return report
 
 
@@ -112,7 +112,7 @@ async def check_completeness(
         select(MonthlyReport).where(MonthlyReport.id == report_id)
     )).scalar_one_or_none()
     if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise HTTPException(status_code=404, detail="הדוח לא נמצא")
 
     # Check bank statement
     stmt_count = (await db.execute(
@@ -175,7 +175,7 @@ async def update_index(
         select(MonthlyReport).where(MonthlyReport.id == report_id)
     )).scalar_one_or_none()
     if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise HTTPException(status_code=404, detail="הדוח לא נמצא")
     report.current_index = current_index
     await db.commit()
     return {"ok": True, "current_index": str(current_index)}
@@ -187,5 +187,5 @@ async def _verify_project(project_id: int, firm_id: int, db: AsyncSession) -> Pr
     )
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")
     return project

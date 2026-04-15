@@ -6,6 +6,11 @@ Calculates monthly:
 - Inputs total (expenses) → input VAT
 - Balance = input - output
 - Cumulative tracking
+
+Handles:
+- VAT-exempt categories (equity, loans, interest, tax refunds, VAT refunds)
+- Separate output/input calculation
+- Per-transaction actual VAT when available (future)
 """
 
 from decimal import Decimal
@@ -16,16 +21,29 @@ from ..models.monthly_report import MonthlyReport
 from ..models.bank_statement import BankTransaction, TransactionType
 from ..models.vat import VatTracking
 
-# Categories that are income (output VAT)
-INCOME_CATEGORIES = {
-    "sale_income", "upgrades_income", "other_income",
+# Categories subject to OUTPUT VAT (מע"מ עסקאות) — income from sales
+OUTPUT_VAT_CATEGORIES = {
+    "sale_income",       # הכנסה ממכירה
+    "upgrades_income",   # הכנסה משידרוגים
+    "other_income",      # הכנסה אחרת
 }
 
-# Categories that are expenses (input VAT)
-EXPENSE_CATEGORIES = {
-    "tenant_expenses", "land_and_taxes", "indirect_costs",
-    "direct_construction", "deposit_to_savings", "other_expense",
+# Categories subject to INPUT VAT (מע"מ תשומות) — expenses with VAT invoices
+INPUT_VAT_CATEGORIES = {
+    "tenant_expenses",       # הוצאות דיירים
+    "indirect_costs",        # הוצאות עקיפות
+    "direct_construction",   # בנייה ישירה
+    "other_expense",         # הוצאה אחרת
 }
+
+# VAT-EXEMPT categories — no VAT calculated
+# land_and_taxes — מס שבח, היטל השבחה, ארנונה (VAT exempt)
+# equity_deposit — הון עצמי (not a transaction with VAT)
+# loan_received / loan_repayment — הלוואה (financial, no VAT)
+# interest_and_fees — ריביות ועמלות (financial services, mostly exempt)
+# tax_refunds — החזרי מיסים (not subject to VAT)
+# vat_refunds — החזרי מע"מ (the refund itself, not a new VAT event)
+# deposit_to_savings — פקדון (transfer, no VAT)
 
 
 async def calculate_vat(
@@ -41,30 +59,47 @@ async def calculate_vat(
 
     vat_rate = report.vat_rate or Decimal("0.18")
 
-    # Get income transactions (output VAT)
-    income_total = Decimal("0")
-    income_result = await db.execute(
+    # Output VAT: income from sales (only categories that generate VAT invoices)
+    income_total = (await db.execute(
         select(func.sum(BankTransaction.amount)).where(
             BankTransaction.monthly_report_id == report_id,
             BankTransaction.transaction_type == TransactionType.CREDIT,
-            BankTransaction.category.in_([c for c in INCOME_CATEGORIES]),
+            BankTransaction.category.in_(list(OUTPUT_VAT_CATEGORIES)),
         )
-    )
-    income_total = income_result.scalar() or Decimal("0")
+    )).scalar() or Decimal("0")
 
-    # Get expense transactions (input VAT)
-    expense_total = Decimal("0")
-    expense_result = await db.execute(
+    # Input VAT: expenses with VAT invoices (construction, indirect, etc.)
+    expense_total = (await db.execute(
         select(func.sum(BankTransaction.amount)).where(
             BankTransaction.monthly_report_id == report_id,
             BankTransaction.transaction_type == TransactionType.DEBIT,
-            BankTransaction.category.in_([c for c in EXPENSE_CATEGORIES]),
+            BankTransaction.category.in_(list(INPUT_VAT_CATEGORIES)),
         )
-    )
-    expense_total = expense_result.scalar() or Decimal("0")
+    )).scalar() or Decimal("0")
 
-    output_vat = (income_total * vat_rate).quantize(Decimal("0.01"))
-    input_vat = (expense_total * vat_rate).quantize(Decimal("0.01"))
+    # VAT-exempt totals (for reporting — land, interest, loans)
+    exempt_income = (await db.execute(
+        select(func.sum(BankTransaction.amount)).where(
+            BankTransaction.monthly_report_id == report_id,
+            BankTransaction.transaction_type == TransactionType.CREDIT,
+            BankTransaction.category.in_(["equity_deposit", "loan_received", "tax_refunds", "vat_refunds"]),
+        )
+    )).scalar() or Decimal("0")
+
+    exempt_expense = (await db.execute(
+        select(func.sum(BankTransaction.amount)).where(
+            BankTransaction.monthly_report_id == report_id,
+            BankTransaction.transaction_type == TransactionType.DEBIT,
+            BankTransaction.category.in_(["land_and_taxes", "loan_repayment", "interest_and_fees", "deposit_to_savings"]),
+        )
+    )).scalar() or Decimal("0")
+
+    # Calculate VAT amounts
+    # Output VAT = income × rate / (1 + rate) — amounts include VAT
+    output_vat = (income_total * vat_rate / (1 + vat_rate)).quantize(Decimal("0.01"))
+    # Input VAT = expense × rate / (1 + rate) — amounts include VAT
+    input_vat = (expense_total * vat_rate / (1 + vat_rate)).quantize(Decimal("0.01"))
+
     balance = input_vat - output_vat  # Positive = refund, negative = pay
 
     # Get previous cumulative

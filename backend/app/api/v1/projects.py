@@ -51,7 +51,7 @@ async def get_project(
     )
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")
     return project
 
 
@@ -67,7 +67,7 @@ async def update_project(
     )
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")
 
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
@@ -88,7 +88,7 @@ async def delete_project(
     )
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")
 
     project.is_active = False  # Soft delete
     await db.commit()

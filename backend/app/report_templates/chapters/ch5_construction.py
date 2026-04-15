@@ -3,8 +3,8 @@
 from ..utils import add_rtl_heading, add_rtl_paragraph, create_rtl_table, format_currency, format_percent
 
 
-def add_chapter_5(doc, construction_data: dict, budget_data: dict | None = None):
-    """Add Chapter 5 - Construction progress."""
+def add_chapter_5(doc, construction_data: dict, budget_data: dict | None = None, milestones: list | None = None):
+    """Add Chapter 5 - Construction progress + milestones."""
     add_rtl_heading(doc, "פרק 5 - התקדמות פיזית", level=1)
 
     # 5.1 Physical vs financial execution
@@ -39,3 +39,19 @@ def add_chapter_5(doc, construction_data: dict, budget_data: dict | None = None)
         add_rtl_paragraph(doc, description)
     else:
         add_rtl_paragraph(doc, "לא הוזן תיאור עבודות")
+
+    # 5.3 Milestones
+    if milestones:
+        doc.add_paragraph()
+        add_rtl_heading(doc, "5.3 אבני דרך", level=2)
+        m_headers = ["סטטוס", "בפועל", "תאריך מתוכנן", "אבן דרך"]
+        m_rows = []
+        for m in milestones:
+            status = "✓ הושלם" if m.get("is_completed") else "ממתין"
+            m_rows.append([
+                status,
+                m.get("actual_date") or "—",
+                m.get("planned_date") or "—",
+                m["name"],
+            ])
+        create_rtl_table(doc, m_headers, m_rows)

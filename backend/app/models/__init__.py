@@ -15,6 +15,7 @@ from .equity import EquityTracking
 from .guarantee import GuaranteeSnapshot
 from .profitability import ProfitabilitySnapshot
 from .sources_uses import SourcesUses
+from .payment_approval import PaymentApproval
 
 __all__ = [
     "Firm", "User",
@@ -28,4 +29,5 @@ __all__ = [
     "ConstructionProgress",
     "VatTracking", "EquityTracking", "GuaranteeSnapshot",
     "ProfitabilitySnapshot", "SourcesUses",
+    "PaymentApproval",
 ]

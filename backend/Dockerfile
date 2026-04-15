@@ -2,9 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps for pdf2image and python-docx
+# System deps: postgres, PDF tools, LibreOffice for docx→pdf
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc poppler-utils \
+    libpq-dev gcc poppler-utils libreoffice-writer \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -12,5 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run migrations then start server
-CMD alembic upgrade head 2>/dev/null; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+EXPOSE 8000
+
+CMD ["python", "start.py"]

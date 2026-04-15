@@ -14,7 +14,10 @@ from ....models.project import Project
 from ....models.monthly_report import MonthlyReport
 from ....models.budget_tracking import BudgetTrackingSnapshot, BudgetTrackingLine
 from ....models.construction import ConstructionProgress
+from ....models.guarantee import GuaranteeSnapshot
 from ....core.dependencies import get_current_user
+from decimal import Decimal
+from sqlalchemy import func
 from ....services.budget_calculator import calculate_budget_tracking
 from ....services.sales_calculator import calculate_sales
 from ....services.vat_calculator import calculate_vat
@@ -42,7 +45,7 @@ async def run_calculations(
         select(MonthlyReport).where(MonthlyReport.id == report_id, MonthlyReport.project_id == project_id)
     )).scalar_one_or_none()
     if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
+        raise HTTPException(status_code=404, detail="הדוח לא נמצא")
 
     results = {}
     errors = []
@@ -165,6 +168,140 @@ async def run_calculations(
     except Exception as e:
         errors.append(f"Construction data error: {str(e)}")
 
+    # 8. Milestones
+    try:
+        from ....models.project import Milestone
+        milestones = (await db.execute(
+            select(Milestone).where(Milestone.project_id == project_id)
+            .order_by(Milestone.display_order)
+        )).scalars().all()
+        if milestones:
+            results["milestones"] = [
+                {
+                    "name": m.name,
+                    "planned_date": str(m.planned_date) if m.planned_date else None,
+                    "actual_date": str(m.actual_date) if m.actual_date else None,
+                    "is_completed": m.actual_date is not None,
+                }
+                for m in milestones
+            ]
+    except Exception as e:
+        errors.append(f"Milestones error: {str(e)}")
+
+    # 9. Guarantees
+    try:
+        guarantee = (await db.execute(
+            select(GuaranteeSnapshot).where(GuaranteeSnapshot.monthly_report_id == report_id)
+        )).scalar_one_or_none()
+        if guarantee:
+            results["guarantees"] = {
+                "items": guarantee.items or [],
+                "total_balance": float(guarantee.total_balance),
+                "total_receipts": float(guarantee.total_receipts),
+                "gap": float(guarantee.gap),
+            }
+    except Exception as e:
+        errors.append(f"Guarantees error: {str(e)}")
+
+    # 10. Equity detail (per-report history)
+    try:
+        from ....models.equity import EquityTracking
+        equity_history = (await db.execute(
+            select(EquityTracking, MonthlyReport.report_number)
+            .join(MonthlyReport, MonthlyReport.id == EquityTracking.monthly_report_id)
+            .where(EquityTracking.project_id == project_id)
+            .order_by(MonthlyReport.report_number)
+        )).all()
+        if equity_history:
+            results.setdefault("equity", {})["history"] = [
+                {
+                    "report_number": row.report_number,
+                    "deposits": str(row.EquityTracking.total_deposits),
+                    "withdrawals": str(row.EquityTracking.total_withdrawals),
+                    "balance": str(row.EquityTracking.current_balance),
+                }
+                for row in equity_history
+            ]
+    except Exception as e:
+        errors.append(f"Equity history error: {str(e)}")
+
+    # 11. Form 50 + Surplus release
+    results["form_50"] = {
+        "form_50_number": report.form_50_number,
+        "form_50_valid_until": str(report.form_50_valid_until) if report.form_50_valid_until else None,
+        "surplus_release_amount": str(report.surplus_release_amount) if report.surplus_release_amount else None,
+    }
+
+    # 12. VAT history (all months)
+    try:
+        from ....models.vat import VatTracking
+        vat_history = (await db.execute(
+            select(VatTracking, MonthlyReport.report_month, MonthlyReport.report_number)
+            .join(MonthlyReport, MonthlyReport.id == VatTracking.monthly_report_id)
+            .where(VatTracking.project_id == project_id)
+            .order_by(MonthlyReport.report_month)
+        )).all()
+        if vat_history:
+            results["vat_history"] = [
+                {
+                    "month": str(row.report_month),
+                    "report_number": row.report_number,
+                    "transactions_total": str(row.VatTracking.transactions_total),
+                    "output_vat": str(row.VatTracking.output_vat),
+                    "inputs_total": str(row.VatTracking.inputs_total),
+                    "input_vat": str(row.VatTracking.input_vat),
+                    "vat_balance": str(row.VatTracking.vat_balance),
+                    "cumulative_vat_balance": str(row.VatTracking.cumulative_vat_balance),
+                }
+                for row in vat_history
+            ]
+    except Exception as e:
+        errors.append(f"VAT history error: {str(e)}")
+
+    # 13. Expense forecast (next month) — pending payments from budget
+    try:
+        from ....models.sales import PaymentScheduleItem, PaymentStatus, SalesContract
+        from datetime import timedelta
+        next_month_start = report.report_month.replace(day=1)
+        if next_month_start.month == 12:
+            next_month_end = next_month_start.replace(year=next_month_start.year + 1, month=1, day=28)
+        else:
+            next_month_end = next_month_start.replace(month=next_month_start.month + 1, day=28)
+
+        # Get budget remaining from latest snapshot
+        budget_remaining = Decimal("0")
+        if "budget_tracking" in results:
+            budget_remaining = Decimal(str(results["budget_tracking"].get("total_remaining", "0")))
+
+        # Estimate monthly construction spend (remaining / estimated months to completion)
+        construction_pct = Decimal("0")
+        if "construction" in results:
+            construction_pct = Decimal(str(results["construction"].get("overall_percent", "0")))
+        remaining_pct = max(Decimal("1"), Decimal("100") - construction_pct)
+        # Rough: how much budget per 1% of progress
+        est_monthly_construction = (budget_remaining / remaining_pct) * Decimal("3") if remaining_pct > 0 else Decimal("0")
+
+        # Expected receipts next month
+        expected_receipts = (await db.execute(
+            select(func.sum(PaymentScheduleItem.scheduled_amount))
+            .join(SalesContract, SalesContract.id == PaymentScheduleItem.contract_id)
+            .where(
+                SalesContract.project_id == project_id,
+                PaymentScheduleItem.status.in_([PaymentStatus.SCHEDULED, PaymentStatus.PARTIAL]),
+                PaymentScheduleItem.scheduled_date >= next_month_start,
+                PaymentScheduleItem.scheduled_date <= next_month_end,
+            )
+        )).scalar() or Decimal("0")
+
+        results["expense_forecast"] = {
+            "budget_remaining": str(budget_remaining),
+            "estimated_monthly_expense": str(round(est_monthly_construction, 0)),
+            "expected_receipts_next_month": str(expected_receipts),
+            "construction_percent": str(construction_pct),
+        }
+    except Exception as e:
+        errors.append(f"Expense forecast error: {str(e)}")
+
     # Update report status
     if not errors:
         report.status = "review"
@@ -182,4 +319,4 @@ async def run_calculations(
 async def _verify_project(project_id: int, firm_id: int, db: AsyncSession):
     result = await db.execute(select(Project).where(Project.id == project_id, Project.firm_id == firm_id))
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   ArrowRight, Upload, ShoppingCart, HardHat,
-  TrendingUp, Shield, ClipboardCheck, FileDown, CheckCircle2,
+  TrendingUp, Shield, ClipboardCheck, FileDown, CheckCircle2, CreditCard,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -24,6 +24,7 @@ const STEPS = [
   { key: "construction", label: "התקדמות בנייה", icon: HardHat, completenessKey: "construction_progress_entered" },
   { key: "index", label: "מדד", icon: TrendingUp, completenessKey: "index_updated" },
   { key: "guarantees", label: "ערבויות", icon: Shield, completenessKey: null },
+  { key: "checks", label: "אישורי שיקים", icon: CreditCard, completenessKey: null },
   { key: "review", label: "סקירה", icon: ClipboardCheck, completenessKey: null },
   { key: "generate", label: "הפקת דוח", icon: FileDown, completenessKey: "ready_to_generate" },
 ];

@@ -229,19 +229,458 @@ class BankStatementAIParser:
         return self._calculate_totals(result)
 
     def _parse_excel(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """Parse an Excel bank statement"""
+        """Parse an Excel bank statement - tries smart fallback first, then AI"""
         import pandas as pd
         import io
+        import re
 
-        # Read Excel file
-        df = pd.read_excel(io.BytesIO(file_content))
+        # Try to read the file - handle both xlsx and html-disguised-as-xls
+        df = None
+        is_html = False
+        raw_text_for_detection = filename
 
-        # Try to identify bank from content or filename
-        bank = self._identify_bank_from_text(filename + ' ' + ' '.join(df.columns.astype(str)))
+        try:
+            df = pd.read_excel(io.BytesIO(file_content), header=None)
+        except Exception:
+            pass
 
-        # Send to Claude for intelligent parsing
-        result = self._analyze_excel_with_claude(df, bank)
-        return self._calculate_totals(result)
+        if df is None:
+            # Try with xlrd engine for old xls format
+            try:
+                df = pd.read_excel(io.BytesIO(file_content), header=None, engine='xlrd')
+            except Exception:
+                pass
+
+        if df is None:
+            # Try reading as HTML (Leumi exports .xls as HTML)
+            try:
+                dfs = pd.read_html(io.BytesIO(file_content))
+                if dfs:
+                    df = dfs[0]
+                    # Reset column names to positional
+                    df.columns = range(len(df.columns))
+                    is_html = True
+            except Exception:
+                pass
+
+        if df is None:
+            raise ValueError("לא ניתן לקרוא את קובץ האקסל - פורמט לא נתמך")
+
+        # Collect all text from the dataframe for bank detection
+        all_text_parts = [filename]
+        for i in range(min(10, len(df))):
+            for val in df.iloc[i].values:
+                if pd.notna(val):
+                    all_text_parts.append(str(val))
+        raw_text_for_detection = ' '.join(all_text_parts)
+
+        # Try smart fallback parsing first (no AI needed)
+        try:
+            result = self._smart_excel_parse(df, raw_text_for_detection, is_html)
+            if result and result.get('transactions'):
+                logger.info(f"Smart Excel parser extracted {len(result['transactions'])} transactions")
+                return self._calculate_totals(result)
+        except Exception as e:
+            logger.warning(f"Smart Excel parser failed: {e}")
+
+        # Fall back to AI parsing
+        bank = self._identify_bank_from_text(raw_text_for_detection)
+        try:
+            result = self._analyze_excel_with_claude(df, bank)
+            return self._calculate_totals(result)
+        except Exception as e:
+            logger.warning(f"AI Excel parser failed: {e}")
+            return self._calculate_totals(self._fallback_excel_parse(df, bank))
+
+    # ──────────────────────────────────────────────────────────────
+    #  Smart Excel parser — works WITHOUT AI for Israeli banks
+    # ──────────────────────────────────────────────────────────────
+
+    def _smart_excel_parse(
+        self, df, raw_text: str, is_html: bool
+    ) -> Dict[str, Any]:
+        """
+        Deterministic Excel parser for Israeli bank statements.
+        Detects bank format, finds header row, maps columns, extracts transactions.
+        """
+        import pandas as pd
+        import re
+
+        bank_code, bank_display = self._detect_bank_from_content(raw_text)
+        account_number = self._extract_account_number(raw_text, bank_code)
+        date_range = self._extract_date_range(raw_text)
+
+        # Detect the format and parse accordingly
+        if bank_code == 'LEUMI' and is_html:
+            transactions, opening_bal, closing_bal = self._parse_leumi_html(df)
+        else:
+            header_row, col_map = self._find_header_and_columns(df, bank_code)
+            if header_row is None:
+                raise ValueError("Could not find header row in Excel file")
+            transactions, opening_bal, closing_bal = self._extract_transactions_from_mapped(
+                df, header_row, col_map, bank_code
+            )
+
+        # Determine date range from transactions if not found in metadata
+        start_date = date_range[0] if date_range else None
+        end_date = date_range[1] if date_range else None
+        if transactions and not start_date:
+            dates = [t['date'] for t in transactions if t.get('date')]
+            if dates:
+                start_date = min(dates)
+                end_date = max(dates)
+
+        return {
+            'bank': bank_code,
+            'bank_display': bank_display,
+            'account_number': account_number,
+            'statement_start_date': start_date,
+            'statement_end_date': end_date,
+            'opening_balance': opening_bal,
+            'closing_balance': closing_bal,
+            'transactions': transactions,
+            'confidence': 0.85,
+            'warnings': ['Parsed using smart Excel fallback (no AI)'],
+        }
+
+    def _detect_bank_from_content(self, text: str) -> Tuple[str, str]:
+        """Detect Israeli bank from text content. Returns (code, display_name)."""
+        text_lower = text.lower()
+
+        # Order matters — check specific patterns first
+        bank_patterns = [
+            (['בנק לאומי', 'לאומי'], 'LEUMI', 'בנק לאומי'),
+            (['הפועלים', 'פועלים', 'poalim'], 'HAPOALIM', 'בנק הפועלים'),
+            (['דיסקונט', 'discount'], 'DISCOUNT', 'בנק דיסקונט'),
+            (['ירושלים'], 'JERUSALEM', 'בנק ירושלים'),
+            (['מזרחי', 'טפחות', 'mizrahi'], 'MIZRAHI', 'בנק מזרחי טפחות'),
+            (['הבינלאומי', 'fibi'], 'INTERNATIONAL', 'הבנק הבינלאומי'),
+            (['אוצר החייל', 'otsar'], 'OTSAR', 'בנק אוצר החייל'),
+            (['מרכנתיל', 'mercantile'], 'MERCANTILE', 'בנק מרכנתיל'),
+            (['יהב', 'yahav'], 'YAHAV', 'בנק יהב'),
+        ]
+
+        for keywords, code, display in bank_patterns:
+            for kw in keywords:
+                if kw in text_lower or kw in text:
+                    return code, display
+
+        return 'OTHER', 'בנק לא מזוהה'
+
+    def _extract_account_number(self, text: str, bank_code: str) -> Optional[str]:
+        """Extract account number from text metadata."""
+        import re
+
+        # "מספר חשבון  12-63-8386"  (Hapoalim)
+        m = re.search(r'מספר חשבון\s+([\d\-]+)', text)
+        if m:
+            return m.group(1).strip()
+
+        # "חשבון: 0198175673"  (Discount)
+        m = re.search(r'חשבון[:\s]+(\d[\d\-]+)', text)
+        if m:
+            return m.group(1).strip()
+
+        # "חשבון 051-510474034"  (Jerusalem)
+        m = re.search(r'חשבון\s+([\d\-]+)', text)
+        if m:
+            return m.group(1).strip()
+
+        # Leumi HTML: branch/account in data rows like "767", "226200/46"
+        # Try a different pattern for Leumi
+        m = re.search(r'(\d{3,})/(\d+)', text)
+        if m and bank_code == 'LEUMI':
+            return m.group(0)
+
+        return None
+
+    def _extract_date_range(self, text: str) -> Optional[Tuple[str, str]]:
+        """Extract statement date range from metadata text."""
+        import re
+
+        # "לתקופה:  01.03.2025 - 01.09.2025"
+        m = re.search(r'לתקופה[:\s]+([\d.]+)\s*-\s*([\d.]+)', text)
+        if m:
+            return (self._parse_date_str(m.group(1)), self._parse_date_str(m.group(2)))
+
+        # "תאריך: 31.10.2025 - 01.10.2025" (Leumi — end first, start second)
+        m = re.search(r'תאריך[:\s]+([\d.]+)\s*-\s*([\d.]+)', text)
+        if m:
+            d1 = self._parse_date_str(m.group(1))
+            d2 = self._parse_date_str(m.group(2))
+            if d1 and d2:
+                return (min(d1, d2), max(d1, d2))
+
+        # "מ: 29.07.2025 עד:10.11.2025"
+        m = re.search(r'מ[:\s]+([\d.]+)\s*עד[:\s]+([\d.]+)', text)
+        if m:
+            return (self._parse_date_str(m.group(1)), self._parse_date_str(m.group(2)))
+
+        return None
+
+    def _parse_date_str(self, s: str) -> Optional[str]:
+        """Parse a date string in various Israeli formats to YYYY-MM-DD."""
+        if not s:
+            return None
+        s = str(s).strip()
+        for fmt in ('%d.%m.%Y', '%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(s, fmt).strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        return None
+
+    def _find_header_and_columns(
+        self, df, bank_code: str
+    ) -> Tuple[Optional[int], Dict[str, Optional[int]]]:
+        """
+        Scan the dataframe to find the header row and map column indices.
+        Returns (header_row_index, column_map).
+
+        Column map keys:
+          date, description, debit, credit, amount, balance
+        """
+        import pandas as pd
+
+        # Hebrew keywords for each column type
+        date_keywords = ['תאריך']
+        desc_keywords = ['תיאור', 'פרטים', 'הפעולה']
+        debit_keywords = ['חובה']
+        credit_keywords = ['זכות']
+        amount_keywords = ['סכום', 'זכות/חובה']
+        balance_keywords = ['יתרה']
+
+        def _matches(cell_text, keywords):
+            cell_lower = str(cell_text).strip()
+            for kw in keywords:
+                if kw in cell_lower:
+                    return True
+            return False
+
+        # Scan first 15 rows for a row with date + (amount or debit/credit) + balance
+        for row_idx in range(min(15, len(df))):
+            row_vals = [str(v).strip() if pd.notna(v) else '' for v in df.iloc[row_idx].values]
+
+            date_col = None
+            desc_col = None
+            debit_col = None
+            credit_col = None
+            amount_col = None
+            balance_col = None
+
+            for col_idx, val in enumerate(row_vals):
+                if not val:
+                    continue
+                if _matches(val, date_keywords) and date_col is None:
+                    date_col = col_idx
+                elif _matches(val, balance_keywords):
+                    balance_col = col_idx
+                elif _matches(val, amount_keywords):
+                    amount_col = col_idx
+                elif _matches(val, debit_keywords) and not _matches(val, amount_keywords):
+                    debit_col = col_idx
+                elif _matches(val, credit_keywords) and not _matches(val, amount_keywords):
+                    credit_col = col_idx
+                elif _matches(val, desc_keywords) and desc_col is None:
+                    desc_col = col_idx
+
+            # If we have separate debit/credit columns, ignore the combined amount column
+            if debit_col is not None and credit_col is not None:
+                amount_col = None
+
+            # Valid header: must have date and (balance or amount or debit)
+            if date_col is not None and (balance_col is not None or amount_col is not None or debit_col is not None):
+                col_map = {
+                    'date': date_col,
+                    'description': desc_col,
+                    'debit': debit_col,
+                    'credit': credit_col,
+                    'amount': amount_col,
+                    'balance': balance_col,
+                }
+                logger.info(f"Found header row at index {row_idx}, col_map={col_map}")
+                return row_idx, col_map
+
+        return None, {}
+
+    def _extract_transactions_from_mapped(
+        self, df, header_row: int, col_map: Dict, bank_code: str
+    ) -> Tuple[List[Dict], Optional[float], Optional[float]]:
+        """Extract transactions using discovered column mapping."""
+        import pandas as pd
+
+        transactions = []
+        opening_balance = None
+        closing_balance = None
+
+        date_col = col_map.get('date')
+        desc_col = col_map.get('description')
+        debit_col = col_map.get('debit')
+        credit_col = col_map.get('credit')
+        amount_col = col_map.get('amount')
+        balance_col = col_map.get('balance')
+
+        for row_idx in range(header_row + 1, len(df)):
+            row = df.iloc[row_idx]
+
+            # Get date — skip rows without a valid date
+            raw_date = row.iloc[date_col] if date_col is not None else None
+            if pd.isna(raw_date) or str(raw_date).strip() == '':
+                continue
+
+            date_str = self._coerce_date(raw_date)
+            if not date_str:
+                # Might be a summary row — check for balance summary
+                continue
+
+            # Description
+            description = ''
+            if desc_col is not None and pd.notna(row.iloc[desc_col]):
+                description = str(row.iloc[desc_col]).strip()
+
+            # Amount / type — prefer separate debit/credit cols over combined amount
+            amount = 0.0
+            tx_type = 'DEBIT'
+
+            if debit_col is not None or credit_col is not None:
+                # Separate debit/credit columns (Hapoalim, Jerusalem)
+                raw_debit = self._to_float(row.iloc[debit_col]) if debit_col is not None else None
+                raw_credit = self._to_float(row.iloc[credit_col]) if credit_col is not None else None
+
+                if raw_credit is not None and raw_credit > 0:
+                    amount = abs(raw_credit)
+                    tx_type = 'CREDIT'
+                elif raw_debit is not None and raw_debit > 0:
+                    amount = abs(raw_debit)
+                    tx_type = 'DEBIT'
+                elif raw_debit is not None and raw_debit != 0:
+                    amount = abs(raw_debit)
+                    tx_type = 'DEBIT'
+                elif raw_credit is not None and raw_credit != 0:
+                    amount = abs(raw_credit)
+                    tx_type = 'CREDIT'
+                else:
+                    # Both are 0 or empty — skip
+                    continue
+            elif amount_col is not None:
+                # Single combined column (Discount style: positive=credit, negative=debit)
+                raw_amt = self._to_float(row.iloc[amount_col])
+                if raw_amt is not None:
+                    amount = abs(raw_amt)
+                    tx_type = 'CREDIT' if raw_amt >= 0 else 'DEBIT'
+                else:
+                    continue
+
+            # Balance
+            balance = 0.0
+            if balance_col is not None and pd.notna(row.iloc[balance_col]):
+                bal = self._to_float(row.iloc[balance_col])
+                if bal is not None:
+                    balance = bal
+
+            transactions.append(self._normalize_transaction({
+                'date': date_str,
+                'description': description,
+                'amount': amount if tx_type == 'CREDIT' else -amount,
+                'balance': balance,
+                'type': tx_type,
+            }))
+
+            # Track opening/closing balance
+            if balance != 0:
+                if opening_balance is None:
+                    opening_balance = balance
+                closing_balance = balance
+
+        return transactions, opening_balance, closing_balance
+
+    def _parse_leumi_html(self, df) -> Tuple[List[Dict], Optional[float], Optional[float]]:
+        """
+        Parse Leumi HTML-format .xls files.
+        Leumi has no explicit header row. Columns are:
+          0: branch, 1: account, 2: date (DD/MM/YYYY), 3: description,
+          4: debit, 5: credit, 6: balance, 7: (empty)
+        Data rows start after the metadata rows.
+        """
+        import pandas as pd
+
+        transactions = []
+        opening_balance = None
+        closing_balance = None
+
+        for row_idx in range(len(df)):
+            row = df.iloc[row_idx]
+
+            # Leumi data rows: col 2 should be a date like "05/10/2025"
+            raw_date = row.iloc[2] if len(row) > 2 else None
+            if pd.isna(raw_date):
+                continue
+            date_str = self._coerce_date(raw_date)
+            if not date_str:
+                continue
+
+            description = str(row.iloc[3]).strip() if len(row) > 3 and pd.notna(row.iloc[3]) else ''
+
+            raw_debit = self._to_float(row.iloc[4]) if len(row) > 4 else None
+            raw_credit = self._to_float(row.iloc[5]) if len(row) > 5 else None
+
+            if raw_credit is not None and raw_credit > 0:
+                amount = raw_credit
+                tx_type = 'CREDIT'
+            elif raw_debit is not None and raw_debit > 0:
+                amount = raw_debit
+                tx_type = 'DEBIT'
+            else:
+                continue
+
+            balance = 0.0
+            if len(row) > 6 and pd.notna(row.iloc[6]):
+                bal = self._to_float(row.iloc[6])
+                if bal is not None:
+                    balance = bal
+
+            transactions.append(self._normalize_transaction({
+                'date': date_str,
+                'description': description,
+                'amount': amount if tx_type == 'CREDIT' else -amount,
+                'balance': balance,
+                'type': tx_type,
+            }))
+
+            if balance != 0:
+                if opening_balance is None:
+                    opening_balance = balance
+                closing_balance = balance
+
+        return transactions, opening_balance, closing_balance
+
+    def _coerce_date(self, val) -> Optional[str]:
+        """Coerce a cell value to YYYY-MM-DD string."""
+        if val is None:
+            return None
+        if isinstance(val, datetime):
+            return val.strftime('%Y-%m-%d')
+        s = str(val).strip()
+        if not s:
+            return None
+        return self._parse_date_str(s)
+
+    def _to_float(self, val) -> Optional[float]:
+        """Coerce a cell value to float, handling commas, ₪ symbols, and empty strings."""
+        import pandas as pd
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return None
+        if isinstance(val, (int, float)):
+            return float(val)
+        s = str(val).strip()
+        # Remove currency symbols, thousands separators, spaces
+        s = s.replace('₪', '').replace(',', '').replace('\u200e', '').replace(' ', '').strip()
+        if not s or s == '-' or s == '- ₪' or s == '-₪':
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
 
     def _analyze_image_with_claude(
         self,

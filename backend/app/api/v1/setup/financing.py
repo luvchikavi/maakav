@@ -95,7 +95,7 @@ async def update_milestone(project_id: int, milestone_id: int, body: MilestoneUp
     result = await db.execute(select(Milestone).where(Milestone.id == milestone_id, Milestone.project_id == project_id))
     ms = result.scalar_one_or_none()
     if not ms:
-        raise HTTPException(status_code=404, detail="Milestone not found")
+        raise HTTPException(status_code=404, detail="אבן הדרך לא נמצאה")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(ms, field, value)
     await db.commit()
@@ -109,7 +109,7 @@ async def delete_milestone(project_id: int, milestone_id: int, user: User = Depe
     result = await db.execute(select(Milestone).where(Milestone.id == milestone_id, Milestone.project_id == project_id))
     ms = result.scalar_one_or_none()
     if not ms:
-        raise HTTPException(status_code=404, detail="Milestone not found")
+        raise HTTPException(status_code=404, detail="אבן הדרך לא נמצאה")
     await db.delete(ms)
     await db.commit()
     return {"ok": True}
@@ -164,4 +164,4 @@ async def get_setup_status(project_id: int, user: User = Depends(get_current_use
 async def _verify(project_id: int, firm_id: int, db: AsyncSession):
     result = await db.execute(select(Project).where(Project.id == project_id, Project.firm_id == firm_id))
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")

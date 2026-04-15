@@ -246,5 +246,5 @@ async def _verify_project(project_id: int, firm_id: int, db: AsyncSession) -> Pr
     )
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")
     return project

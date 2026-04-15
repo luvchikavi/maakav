@@ -2,94 +2,134 @@
 
 ## Priority 1: Core Gaps (Must Fix Before Deploy)
 
-### 1. Guarantees (ערבויות) - Currently Placeholder
-- **What's missing:** Upload zone exists but doesn't process the file
-- **What's needed:** Parse guarantee PDF/Excel, extract items (buyer, amount, type, expiry)
-- **Also needed:** Guarantee vs receipts comparison table in report (Chapter 7.6)
-- **Nectra has:** GuaranteeSnapshot + GuaranteeSnapshotItem models, guarantee_tracking service
+### 1. Sales Entry in Monthly Wizard (Step 2) ✅ DONE
+- Full sales entry form: apartment dropdown (unsold only), buyer name/ID, date, price with/without VAT
+- Auto-fill prices from apartment list, auto-calc no-VAT from with-VAT (÷1.18)
+- Sales list table with delete + payment schedule link
+- New endpoint: GET /projects/{id}/apartments/unsold
+- New endpoint: DELETE /projects/{id}/sales/{id}
 
-### 2. Sales Entry in Monthly Wizard (Step 2)
-- **What's missing:** Step 2 only shows summary, can't add new sales
-- **What's needed:** Form to add new sale (select apartment, buyer name, price, date)
-- **Also needed:** Payment schedule entry per sale (installments)
+### 2. Payment Schedule UI ✅ DONE
+- Per-sale payment schedule modal with add/edit/delete
+- Status management: scheduled → paid/partial/overdue
+- Auto-mark as paid with amount + date when status changes
+- Totals: scheduled vs paid vs remaining
+- Backend: Full CRUD endpoints (GET/POST/PATCH/DELETE) for PaymentScheduleItem
 
-### 3. Payment Schedule UI
-- **What's missing:** PaymentScheduleItem model exists but no UI to enter installments
-- **What's needed:** Per-sale payment grid (date, amount, status)
-- **Required for:** Arrears calculation, recognized sales (>15%), receipts tracking
+### 3. Guarantees (ערבויות) ✅ DONE
+- AI-powered guarantee parser (Claude Vision for PDF, auto-detect columns for Excel)
+- Upload + parse → items table with type badges, amounts, expiry
+- Delete individual items, re-upload replaces
+- New service: guarantee_parser_service.py (240 LOC)
+- New endpoints: POST upload, GET snapshot, PUT items
+- Frontend: full items table with summary cards
 
-### 4. Full Sales List in Report (Chapter 7.1)
-- **What's missing:** Report only has summary, not the full apartment-by-apartment sales table
-- **What's needed:** Table with: serial, building, unit, buyer, date, price with VAT, price no VAT, Report 0 price, difference
+### 4. Full Sales List in Report (Chapter 7.1) ✅ DONE
+- Table with: #, building, unit, buyer, date, sale price, Report 0 price, difference
+- Totals row at bottom
+- Uses report_0_comparison data from sales calculator
 
-### 5. Milestones in Report (Chapter 5.3)
-- **What's missing:** Milestones data exists but not included in Word report
-- **What's needed:** Table with: milestone name, planned date, actual date
+### 5. Milestones in Report (Chapter 5.3) ✅ DONE
+- Table with: milestone name, planned date, actual date, status (✓ completed / waiting)
+- Data loaded from milestones table via calculations endpoint
 
-### 6. Equity Detail Table (Chapter 9.2)
-- **What's missing:** Only shows totals, not per-report deposits/withdrawals
-- **What's needed:** Table listing each deposit/withdrawal by report number (like the Excel)
-
-## Priority 2: Important Features
-
-### 7. AI Auto-Classification of Transactions
-- **What's missing:** User must manually classify every transaction
-- **What's needed:** After AI parsing, suggest category based on description
-- **Approach:** Claude API with category taxonomy + project context
-- **Nectra has:** Smart upload service with column mapping suggestions
-
-### 8. PDF Report Conversion
-- **What's missing:** Only Word output, no PDF
-- **What's needed:** LibreOffice headless conversion (or alternative)
-- **For deploy:** Need LibreOffice in Docker image
-
-### 9. Exposure Report (דוח חשיפה)
-- **What's missing:** Not implemented
-- **What's needed:** Monthly tracking of bank exposure (sold %, construction %, credit used)
-- **Nectra has:** Basic exposure tracking in BankTransactionsSection
-
-### 10. Cashflow Forecast (תזרים מזומנים)
-- **What's missing:** Not implemented
-- **What's needed:** Monthly projected income vs expenses
-
-## Priority 3: Polish
-
-### 11. Hebrew Error Messages
-- **What's missing:** Some API errors return English
-- **What's needed:** Consistent Hebrew throughout
-
-### 12. Mobile Responsiveness
-- **What's missing:** Sidebar doesn't collapse on mobile
-- **What's needed:** Responsive sidebar, touch-friendly progress slider
-
-### 13. User Management
-- **What's missing:** Only seed-created admin
-- **What's needed:** Invite users, assign roles (admin/appraiser/viewer)
+### 6. Guarantee Status + Equity Detail in Report (Chapters 7.6, 9.2) ✅ DONE
+- **Ch 7.6:** Full guarantee items table with type labels, amounts, expiry, apartment number
+- **Ch 9.2:** Per-report equity history table (report number, deposits, withdrawals, balance)
 
 ---
 
-## Excel Upload Strategy (To Discuss)
+## Priority 2: Important Features (Post-Deploy)
 
-### Current State:
-- Budget upload: works, auto-detects sheet + header row
-- Apartments upload: works, handles multiple sheets (developer + owner)
-- Bank statement: AI parsing from PDF
+### 7. AI Auto-Classification of Transactions ✅ DONE
+- Two-phase classification: rule-based patterns (instant, 75% confidence) + Claude Haiku fallback
+- Auto-classifies on upload (high-confidence applied automatically)
+- Manual "auto-classify" button for remaining unclassified
+- AI badge on auto-classified transactions, purple vs green for manual
+- New service: transaction_classifier.py (190 LOC)
 
-### Questions to Resolve:
-1. Should there be a single "bulk upload" Excel template for initial project setup?
-2. Should the system accept the office's existing Excel format (21-tab workbook)?
-3. How to handle monthly bank statement Excel vs PDF?
-4. Should the system support importing from the existing monitoring Excel (מעקב חודשי)?
+### 8. PDF Report Conversion ✅ DONE
+- LibreOffice headless conversion (docx → pdf)
+- Auto-detects LibreOffice on Mac/Linux/Docker
+- Generate page shows Word + PDF buttons
+- Graceful fallback: if LibreOffice unavailable, shows Word only
+- New service: pdf_converter.py
+- GET /reports/pdf-available endpoint for frontend check
+
+### 9. Exposure Report (דוח חשיפה) ✅ DONE
+- Calculates: sales %, construction %, credit utilization, net exposure
+- Net exposure = credit used - receipts - equity
+- Shown in review step after calculations run
+- New service: exposure_calculator.py
+- GET /exposure endpoint
+
+### 10. Cashflow Forecast (תזרים מזומנים) ✅ DONE
+- Projects 6 months ahead (configurable)
+- Income: scheduled payment receipts from sales contracts
+- Expenses: remaining budget spread evenly + monthly interest
+- Monthly table with net flow + cumulative balance
+- Shown in review step
+- New service: cashflow_calculator.py
+- GET /cashflow endpoint
 
 ---
 
-## Code to Port from Nectra
+## Priority 3: Polish ✅ COMPLETE
 
-| Nectra File | Purpose | Port Status |
-|-------------|---------|-------------|
-| bank_statement_ai_parser.py | AI bank PDF parsing | ✅ Ported |
-| excel_importer.py | Apartment Excel import | ✅ Adapted |
-| file_upload_views.py | Sheet/header auto-detection | ✅ Adapted |
-| excel_generator.py | Excel export | ⬜ Not yet |
-| guarantee_tracking.py | Guarantee processing | ⬜ Needed |
-| smart_upload_service.py | AI column mapping | ⬜ Could help with auto-classification |
+### 11. Hebrew Error Messages ✅ DONE
+- 35 English error messages replaced with Hebrew across all 13 API files
+
+### 12. Mobile Responsiveness ✅ DONE
+- Sidebar: hidden on mobile, hamburger button opens overlay with slide-in animation
+- Layout: responsive padding, mobile-safe top margin for hamburger
+- Desktop: unchanged (fixed 256px sidebar)
+
+### 13. User Management ✅ DONE
+- Backend: 5 endpoints (list, create, update, reset-password, delete)
+- Admin-only access for create/update/delete
+- Frontend: /users page with table, role dropdowns, status toggles
+- Invite modal: name, email, password, role selection
+- Reset password modal
+- Sidebar updated with users link
+
+---
+
+## Excel Upload Strategy ✅ RESOLVED
+
+- **Bulk upload** works: 8-tab unified Excel → all data distributed automatically
+- **Bank statement Excel**: smart fallback parser works for all 7 Israeli banks (no AI needed)
+- **Bank statement PDF**: Claude Vision AI (requires ANTHROPIC_API_KEY with credits)
+- **Individual uploads** still available for each section separately
+
+## Overnight Fixes (Apr 15)
+
+### Bank Statement Excel Parser ✅
+- Smart column detection for all Israeli banks: לאומי, פועלים, דיסקונט, ירושלים, מזרחי, הבינלאומי, מרכנתיל
+- Works WITHOUT AI — direct column mapping
+- Tested: 4/4 Excel samples parsed correctly (27-47 transactions each)
+
+### VAT Calculation Refinement ✅
+- VAT-exempt categories properly excluded (land tax, equity, loans, interest)
+- VAT extracted from amounts (÷1.18) instead of flat 18% multiplication
+- Monthly VAT history table in report and review step
+
+### Form 50 + Surplus Release ✅
+- Fields added to MonthlyReport model
+- Included in calculations endpoint and Word report (Chapter 10)
+
+### Expense Forecast ✅
+- Budget remaining + estimated monthly expense + expected receipts
+- Shown in review step as "תחזית חודש הבא" card
+
+### Guarantee Cross-Validation ✅
+- GET /guarantees/validate endpoint
+- Checks: sold apartments without guarantee, receipts vs guarantee gap
+- Returns typed alerts with severity
+
+## Implementation Status
+
+```
+All P1 + P2 + P3 gaps closed ✅
+Overnight fixes applied ✅
+Strategic roadmap: see ROADMAP.md
+```

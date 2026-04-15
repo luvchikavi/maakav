@@ -245,18 +245,109 @@
 - [ ] User management (invite users, roles)
 - [ ] Railway + Vercel deployment execution
 - [ ] PDF conversion (LibreOffice)
-- [ ] Remaining report chapters (7.1, 5.3, 7.4, 7.6)
 - [ ] AI auto-classification of transactions
 - [ ] User documentation / onboarding
 
 ---
 
+## Phase 7A: Sales & Payments ✅ COMPLETE
+### Sales Entry (Wizard Step 2)
+- [x] Frontend: Sales entry form with apartment dropdown (unsold only), buyer name/ID, date, prices
+- [x] Frontend: Auto-fill prices from apartment list, auto-calc no-VAT (÷1.18)
+- [x] Frontend: Sales list table with delete + payment schedule button
+- [x] Backend: GET /projects/{id}/apartments/unsold endpoint
+- [x] Backend: DELETE /projects/{id}/sales/{id} endpoint
+
+### Payment Schedule
+- [x] Backend: Full CRUD endpoints (GET/POST/PATCH/DELETE) for PaymentScheduleItem
+- [x] Frontend: Payment schedule modal per sale (add, edit status, delete)
+- [x] Frontend: Status indicators (scheduled/paid/partial/overdue) with color badges
+- [x] Frontend: Summary cards (total scheduled, paid, remaining)
+
+---
+
+## Phase 7B: Guarantees ✅ COMPLETE
+### Guarantee Processing (Wizard Step 5)
+- [x] Backend: guarantee_parser_service.py (240 LOC) — AI-powered Excel/PDF parser
+- [x] Backend: POST /guarantees/upload, GET /guarantees, PUT /guarantees/items
+- [x] Frontend: Upload + parse → items table with type badges, amounts, expiry
+- [x] Frontend: Delete individual items, re-upload replaces
+- [x] Frontend: Summary cards (total count, sale_law count, total balance)
+
+---
+
+## Phase 7C: Missing Report Chapters ✅ COMPLETE
+### Word Report Additions
+- [x] Chapter 7.1: Full sales list table (#, building, unit, buyer, date, price, Report 0, diff) + totals row
+- [x] Chapter 5.3: Milestones table (name, planned date, actual date, status)
+- [x] Chapter 7.6: Guarantee items table (buyer, type, apartment, original, indexed, expiry)
+- [x] Chapter 9.2: Equity per-report history table (report number, deposits, withdrawals, balance)
+- [x] Updated tracking_report.py to pass milestones + guarantees to chapter generators
+- [x] Updated calculations endpoint to include milestones, guarantees, equity history
+
+---
+
+## Phase 8: P2 Features ✅ COMPLETE
+### AI Auto-Classification (#7)
+- [x] transaction_classifier.py — rule-based + Claude Haiku fallback
+- [x] Auto-classifies on bank statement upload (high-confidence auto-applied)
+- [x] POST /transactions/auto-classify endpoint for manual trigger
+- [x] Frontend: "סווג אוטומטי" button + AI badges on auto-classified rows
+
+### PDF Report Conversion (#8)
+- [x] pdf_converter.py — LibreOffice headless (Mac/Linux/Docker)
+- [x] GET /reports/pdf-available health check
+- [x] POST /generate?format=pdf|docx
+- [x] Frontend: Word + PDF download buttons in generate step
+
+### Exposure Report (#9)
+- [x] exposure_calculator.py — sales %, construction %, credit utilization, net exposure
+- [x] GET /exposure endpoint
+- [x] Shown in review step with 7-stat card layout
+
+### Cashflow Forecast (#10)
+- [x] cashflow_calculator.py — 6-month projection from payment schedule + budget remaining
+- [x] GET /cashflow?months=6 endpoint
+- [x] Shown in review step with monthly table + summary totals
+
+---
+
+## Phase 9: Polish (P3) ✅ COMPLETE
+### Hebrew Error Messages (#11)
+- [x] 35 English error messages replaced with Hebrew across 13 API files
+
+### Mobile Responsiveness (#12)
+- [x] Collapsible sidebar: hamburger menu on mobile, slide-in overlay
+- [x] Responsive layout padding (mobile top padding for hamburger)
+- [x] CSS animation for sidebar slide-in
+
+### User Management (#13)
+- [x] Backend: 5 endpoints — list, create, update role, reset password, delete
+- [x] Admin-only access control
+- [x] Frontend: /users page with role dropdowns, status toggles, invite + reset modals
+- [x] Sidebar: added users navigation link
+
+---
+
+## Phase 10: Deploy ⬜ NOT STARTED
+- [ ] Railway backend deployment (see DEPLOYMENT.md)
+- [ ] Vercel frontend deployment
+- [ ] Environment variables configuration
+- [ ] Domain setup (maakav.co.il or subdomain)
+- [ ] SSL + health check verification
+- [ ] Smoke test on production
+
+---
+
 ## Summary Statistics
-- **Commits:** 15
-- **Backend files:** ~85
-- **Frontend pages:** 16
+- **Commits:** 18+
+- **Backend files:** ~98
+- **Frontend pages:** 17
 - **DB models:** 17
-- **Calculator services:** 6
-- **Report chapters:** 7
-- **API endpoints:** ~55
-- **Total lines of code:** ~12,500
+- **Calculator services:** 9
+- **Report chapters:** 11
+- **API endpoints:** ~70
+- **Total lines of code:** ~17,500
+- **Open P1 gaps:** 0 ✅
+- **Open P2 gaps:** 0 ✅
+- **Open P3 gaps:** 0 ✅

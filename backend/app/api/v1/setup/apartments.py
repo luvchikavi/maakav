@@ -81,7 +81,7 @@ async def delete_apartment(
     )
     apt = result.scalar_one_or_none()
     if not apt:
-        raise HTTPException(status_code=404, detail="Apartment not found")
+        raise HTTPException(status_code=404, detail="הדירה לא נמצאה")
     await db.delete(apt)
     await db.commit()
     return {"ok": True}
@@ -217,4 +217,4 @@ async def _verify_project(project_id: int, firm_id: int, db: AsyncSession):
         select(Project).where(Project.id == project_id, Project.firm_id == firm_id)
     )
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail="הפרויקט לא נמצא")

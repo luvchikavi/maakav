@@ -28,6 +28,8 @@ class UnitType(str, enum.Enum):
     PENTHOUSE = "penthouse"
     GARDEN = "garden"
     DUPLEX = "duplex"
+    DUPLEX_GARDEN = "duplex_garden"
+    DUPLEX_ROOF = "duplex_roof"
     MINI_PENTHOUSE = "mini_penthouse"
     OFFICE = "office"
     RETAIL = "retail"
@@ -64,6 +66,10 @@ class Apartment(Base):
     list_price_no_vat: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     price_per_sqm: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     report_0_price_no_vat: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))  # מחיר דוח 0
+    gross_area_sqm: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))  # שטח ברוטו (מסחרי)
+    gallery_area_sqm: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))  # גלריה (מסחרי)
+    secondary_type: Mapped[str | None] = mapped_column(String(50))  # סוג משני (מסחרי)
+    owner_name: Mapped[str | None] = mapped_column(String(200))  # שם הבעלים (למלאי בעלים)
     include_in_revenue: Mapped[bool] = mapped_column(Boolean, default=True)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
