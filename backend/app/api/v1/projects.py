@@ -14,7 +14,7 @@ from ...core.dependencies import get_current_user
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
-@router.get("/", response_model=list[ProjectResponse])
+@router.get("", response_model=list[ProjectResponse])
 async def list_projects(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -27,7 +27,7 @@ async def list_projects(
     return result.scalars().all()
 
 
-@router.post("/", response_model=ProjectDetailResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProjectDetailResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     body: ProjectCreate,
     user: User = Depends(get_current_user),
