@@ -126,95 +126,366 @@ class BankStatementAIParser:
             raise ValueError(f"Unsupported file type: {file_type}")
 
     def _parse_pdf(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """Parse a PDF bank statement by converting to images and using vision"""
-        try:
-            # Try to import pdf2image
-            from pdf2image import convert_from_bytes
-
-            # Convert PDF to images
-            images = convert_from_bytes(file_content, dpi=200)
-
-            if not images:
-                raise ValueError("Could not extract any pages from PDF")
-
-            # For now, process first 3 pages max (to manage token usage)
-            all_transactions = []
-            bank_info = None
-
-            for i, image in enumerate(images[:3]):
-                # Convert PIL image to base64
-                import io
-                img_buffer = io.BytesIO()
-                image.save(img_buffer, format='PNG')
-                img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
-
-                # Parse this page
-                page_result = self._analyze_image_with_claude(
-                    img_base64,
-                    'image/png',
-                    page_num=i+1,
-                    is_first_page=(i == 0)
-                )
-
-                # Merge results
-                if i == 0 and page_result.get('bank'):
-                    bank_info = page_result
-
-                if page_result.get('transactions'):
-                    all_transactions.extend(page_result['transactions'])
-
-            # Combine results
-            result = bank_info or {}
-            result['transactions'] = all_transactions
-            result = self._calculate_totals(result)
-
-            return result
-
-        except ImportError:
-            logger.warning("pdf2image not installed, trying alternative method")
-            return self._parse_pdf_fallback(file_content, filename)
-
-    def _parse_pdf_fallback(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """Fallback PDF parsing using PyMuPDF or returning error"""
+        """Parse a PDF bank statement — text extraction first, AI vision fallback."""
+        import re
         try:
             import fitz  # PyMuPDF
+        except ImportError:
+            raise ValueError("PyMuPDF is not installed. pip install pymupdf")
 
-            # Open PDF
+        doc = fitz.open(stream=file_content, filetype="pdf")
+        full_text = ""
+        for page in doc:
+            full_text += page.get_text() + "\n"
+        doc.close()
+
+        # If the PDF has meaningful text, parse deterministically (no AI needed)
+        if len(full_text.strip()) > 100:
+            try:
+                result = self._parse_pdf_text(full_text, filename)
+                if result and result.get('transactions'):
+                    logger.info(f"PDF text parser extracted {len(result['transactions'])} transactions")
+                    return self._calculate_totals(result)
+            except Exception as e:
+                logger.warning(f"PDF text parser failed: {e}")
+
+        # Fallback: scanned PDF → convert to images + Claude Vision
+        logger.info("PDF has no extractable text, falling back to AI vision")
+        return self._parse_pdf_with_vision(file_content, filename)
+
+    def _parse_pdf_text(self, text: str, filename: str) -> Dict[str, Any]:
+        """Deterministic parser for Israeli bank statement PDFs with extractable text."""
+        import re
+
+        bank_code, bank_display = self._detect_bank_from_content(text)
+        account_number = self._extract_account_number(text, bank_code)
+        date_range = self._extract_date_range(text)
+
+        transactions = []
+
+        if bank_code in ('DISCOUNT', 'MERCANTILE'):
+            transactions = self._parse_discount_pdf_text(text)
+        elif bank_code == 'LEUMI':
+            transactions = self._parse_leumi_pdf_text(text)
+        elif bank_code == 'JERUSALEM':
+            transactions = self._parse_jerusalem_pdf_text(text)
+        elif bank_code == 'MIZRAHI':
+            transactions = self._parse_mizrahi_pdf_text(text)
+        elif bank_code == 'INTERNATIONAL':
+            transactions = self._parse_fibi_pdf_text(text)
+        else:
+            # Generic: try all patterns
+            for parser in [
+                self._parse_discount_pdf_text,
+                self._parse_leumi_pdf_text,
+                self._parse_jerusalem_pdf_text,
+                self._parse_mizrahi_pdf_text,
+                self._parse_fibi_pdf_text,
+            ]:
+                transactions = parser(text)
+                if transactions:
+                    break
+
+        start_date = date_range[0] if date_range else None
+        end_date = date_range[1] if date_range else None
+        if transactions and not start_date:
+            dates = [t['date'] for t in transactions if t.get('date')]
+            if dates:
+                start_date = min(dates)
+                end_date = max(dates)
+
+        opening_balance = None
+        closing_balance = None
+        for t in transactions:
+            if t.get('balance') and t['balance'] != 0:
+                if opening_balance is None:
+                    opening_balance = t['balance']
+                closing_balance = t['balance']
+
+        return {
+            'bank': bank_code,
+            'bank_display': bank_display,
+            'account_number': account_number,
+            'statement_start_date': start_date,
+            'statement_end_date': end_date,
+            'opening_balance': opening_balance,
+            'closing_balance': closing_balance,
+            'transactions': transactions,
+            'confidence': 0.90,
+            'warnings': ['Parsed from PDF text (no AI)'],
+        }
+
+    def _parse_discount_pdf_text(self, text: str) -> List[Dict]:
+        """Parse Discount/Mercantile PDF format.
+        Pattern: date\\nvalue_date\\ndescription+ref\\namount\\nbalance
+        Amount is signed: negative=debit, positive=credit.
+        """
+        import re
+        transactions = []
+        # Match: DD/MM/YYYY followed by another date, description, signed amount, balance
+        # Discount format has lines like:
+        #   11/08/2025\n11/08/2025\n09700992682 דמי טיפול559\n-50.00\n515,841.57
+        pattern = re.compile(
+            r'(\d{2}/\d{2}/\d{4})\n'           # transaction date
+            r'\d{2}/\d{2}/\d{4}\n'              # value date (skip)
+            r'(.+?)\n'                          # description
+            r'(-?[\d,]+\.?\d*)\n'               # amount (signed)
+            r'(-?[\d,]+\.?\d*)',                 # balance
+        )
+        for m in pattern.finditer(text):
+            date_str = self._parse_date_str(m.group(1))
+            description = m.group(2).strip()
+            amount = float(m.group(3).replace(',', ''))
+            balance = float(m.group(4).replace(',', ''))
+            tx_type = 'CREDIT' if amount >= 0 else 'DEBIT'
+            transactions.append(self._normalize_transaction({
+                'date': date_str,
+                'description': description,
+                'amount': amount,
+                'balance': balance,
+                'type': tx_type,
+            }))
+        return transactions
+
+    def _parse_leumi_pdf_text(self, text: str) -> List[Dict]:
+        """Parse Leumi PDF format.
+        Pattern: DD.MM.YYYYdescription₪ amount\\n₪ balance
+        Amounts in חובה column = debit, amounts in זכות column = credit.
+        """
+        import re
+        transactions = []
+        # Leumi: "05.10.2025העמדת הלואה₪ 40,800.00\n₪ 32,482.87"
+        # Or:    "05.10.2025עמ.גל"י לבנקים₪ 1.73\n₪ 32,481.14"
+        pattern = re.compile(
+            r'(\d{2}\.\d{2}\.\d{4})'            # date
+            r'(.+?)'                             # description
+            r'₪\s*([\d,]+\.?\d*)\n'              # amount
+            r'₪\s*(-?[\d,]+\.?\d*)',             # balance
+        )
+
+        # Detect which column headers appear to determine debit/credit
+        # Leumi has "חובה" and "זכות" headers
+        has_debit_credit = 'חובה' in text and 'זכות' in text
+
+        for m in pattern.finditer(text):
+            date_str = self._parse_date_str(m.group(1))
+            description = m.group(2).strip()
+            amount = float(m.group(3).replace(',', ''))
+            balance = float(m.group(4).replace(',', ''))
+
+            # In Leumi, the amount position determines type
+            # But from text extraction, we can't distinguish columns reliably
+            # Use balance change to determine: if balance went down, it's debit
+            tx_type = 'DEBIT'  # default
+            transactions.append(self._normalize_transaction({
+                'date': date_str,
+                'description': description,
+                'amount': -amount,  # Mark as negative initially
+                'balance': balance,
+                'type': tx_type,
+            }))
+
+        # Fix debit/credit using balance changes
+        self._fix_types_from_balance(transactions)
+        return transactions
+
+    def _parse_jerusalem_pdf_text(self, text: str) -> List[Dict]:
+        """Parse Jerusalem bank PDF format.
+        Columns (RTL): date, description, reference, debit, credit, balance
+        Text extraction gives: balance, credit, debit, [reference lines], description+date
+        """
+        import re
+        transactions = []
+        # Jerusalem text has: " 2,487,421.87 \n0.00\n66,338.19\n0510474034אמפא קפיטל29.07.2025"
+        # Or with extra ref: " 214,126.21 \n153,521.29\n0.00\n0000000002\n0001070404 פרטי שובר10.08.2025"
+        # Pattern: balance\ncredit\ndebit\n[optional ref lines]\ndescription+date
+        pattern = re.compile(
+            r'\s([\d,]+\.?\d{2})\s*\n'           # balance (with leading space)
+            r'([\d,]+\.?\d{2})\n'                # credit
+            r'([\d,]+\.?\d{2})\n'                # debit
+            r'(?:[\d\s]*\n)*?'                   # optional reference lines (digits/spaces)
+            r'(.+?)(\d{2}\.\d{2}\.\d{4})',       # description + date
+        )
+        for m in pattern.finditer(text):
+            balance = float(m.group(1).replace(',', ''))
+            credit = float(m.group(2).replace(',', ''))
+            debit = float(m.group(3).replace(',', ''))
+            description = m.group(4).strip()
+            date_str = self._parse_date_str(m.group(5))
+
+            if credit > 0:
+                amount = credit
+                tx_type = 'CREDIT'
+            else:
+                amount = debit
+                tx_type = 'DEBIT'
+
+            transactions.append(self._normalize_transaction({
+                'date': date_str,
+                'description': description,
+                'amount': amount if tx_type == 'CREDIT' else -amount,
+                'balance': balance,
+                'type': tx_type,
+            }))
+        return transactions
+
+    def _parse_mizrahi_pdf_text(self, text: str) -> List[Dict]:
+        """Parse Mizrahi-Tefahot PDF format.
+        Pattern: DD/MM/YY description signed_amount [ref]\\nbalance
+        """
+        import re
+        transactions = []
+        # Mizrahi: "30/10/25העברה לבנק אחר-1,358.00\n430015"
+        # Or: "04/11/25החזרי מע\"מ171,605.00\n347,172.77\n15997"
+        pattern = re.compile(
+            r'(\d{2}/\d{2}/\d{2})'               # date DD/MM/YY
+            r'\n?(\d{2}/\d{2}/\d{2}\n)?'          # optional value date
+            r'(.+?)'                              # description
+            r'(-?[\d,]+\.?\d{2})\n'               # amount
+            r'(?:(\d+)\n)?'                        # optional reference
+        )
+        # More robust: scan line by line
+        lines = text.split('\n')
+        i = 0
+        prev_balance = None
+        while i < len(lines):
+            line = lines[i].strip()
+            # Match date at start: DD/MM/YY
+            dm = re.match(r'^(\d{2}/\d{2}/\d{2})(.+?)(-?[\d,]+\.\d{2})$', line)
+            if dm:
+                raw_date = dm.group(1)
+                # Convert YY to YYYY
+                parts = raw_date.split('/')
+                if len(parts) == 3 and len(parts[2]) == 2:
+                    raw_date = f"{parts[0]}/{parts[1]}/20{parts[2]}"
+                date_str = self._parse_date_str(raw_date)
+                description = dm.group(2).strip()
+                amount = float(dm.group(3).replace(',', ''))
+                tx_type = 'CREDIT' if amount >= 0 else 'DEBIT'
+
+                # Look ahead for balance
+                balance = 0.0
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1].strip()
+                    bal_m = re.match(r'^(-?[\d,]+\.\d{2})$', next_line)
+                    if bal_m:
+                        balance = float(bal_m.group(1).replace(',', ''))
+
+                transactions.append(self._normalize_transaction({
+                    'date': date_str,
+                    'description': description,
+                    'amount': amount,
+                    'balance': balance,
+                    'type': tx_type,
+                }))
+            i += 1
+        return transactions
+
+    def _parse_fibi_pdf_text(self, text: str) -> List[Dict]:
+        """Parse FIBI (International) PDF format.
+        Complex multi-line format with RTL column ordering.
+        """
+        import re
+        transactions = []
+        # FIBI: "03/10/2025בחשבונות קבועים ניהול דמי \nש'עו22.50\n205205\n257"
+        # Pattern varies. Use: date, description, amount, reference
+        pattern = re.compile(
+            r'(\d{2}/\d{2}/\d{4})'              # date
+            r'\n\d{2}/\d{2}/\d{4}\n'             # value date
+            r'(.+?)'                             # description
+            r'([\d,]+\.?\d{2})\n'                # amount
+            r'(.+?)\n'                           # reference/extra
+            r'(\d+)\n',                          # code
+        )
+        # Simpler approach: find all amounts near dates
+        lines = text.split('\n')
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            dm = re.match(r'^(\d{2}/\d{2}/\d{4})(.+)', line)
+            if dm:
+                date_str = self._parse_date_str(dm.group(1))
+                rest = dm.group(2).strip()
+                # Extract description and amount from rest or subsequent lines
+                amt_m = re.search(r'([\d,]+\.\d{2})', rest)
+                if amt_m:
+                    description = rest[:amt_m.start()].strip()
+                    amount = float(amt_m.group(1).replace(',', ''))
+                    # Look for balance: a number with a negative sign on the line containing it
+                    balance = 0.0
+                    # Check a few lines ahead for a balance-like number
+                    for j in range(1, min(5, len(lines) - i)):
+                        nxt = lines[i + j].strip()
+                        bal_m = re.match(r'^(-?[\d,]+\.\d{2})$', nxt)
+                        if bal_m:
+                            balance = float(bal_m.group(1).replace(',', ''))
+                            break
+
+                    # Determine type from context — FIBI has separate debit column
+                    # Without column info, use 'DEBIT' as default for construction accounts
+                    tx_type = 'DEBIT'
+                    transactions.append(self._normalize_transaction({
+                        'date': date_str,
+                        'description': description,
+                        'amount': -amount,
+                        'balance': balance,
+                        'type': tx_type,
+                    }))
+            i += 1
+
+        # Fix types using balance progression
+        self._fix_types_from_balance(transactions)
+        return transactions
+
+    def _fix_types_from_balance(self, transactions: List[Dict]) -> None:
+        """Infer debit/credit from balance changes when column info is lost in text extraction."""
+        for i in range(1, len(transactions)):
+            prev_bal = transactions[i - 1].get('balance', 0)
+            curr_bal = transactions[i].get('balance', 0)
+            amount = transactions[i].get('amount', 0)
+
+            if prev_bal == 0 or curr_bal == 0:
+                continue
+
+            diff = curr_bal - prev_bal
+            # If balance went up, the transaction was a credit
+            if diff > 0:
+                transactions[i]['type'] = 'CREDIT'
+                transactions[i]['amount'] = abs(amount)
+            elif diff < 0:
+                transactions[i]['type'] = 'DEBIT'
+                transactions[i]['amount'] = abs(amount)
+
+    def _parse_pdf_with_vision(self, file_content: bytes, filename: str) -> Dict[str, Any]:
+        """Fallback: parse scanned/image PDF using Claude Vision."""
+        try:
+            import fitz
             doc = fitz.open(stream=file_content, filetype="pdf")
-
             all_transactions = []
             bank_info = None
 
-            for page_num in range(min(3, len(doc))):  # First 3 pages
+            for page_num in range(min(3, len(doc))):
                 page = doc[page_num]
-
-                # Render page to image
-                mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better quality
+                mat = fitz.Matrix(2.0, 2.0)
                 pix = page.get_pixmap(matrix=mat)
                 img_bytes = pix.tobytes("png")
                 img_base64 = base64.b64encode(img_bytes).decode('utf-8')
 
-                # Parse this page
                 page_result = self._analyze_image_with_claude(
-                    img_base64,
-                    'image/png',
-                    page_num=page_num+1,
+                    img_base64, 'image/png',
+                    page_num=page_num + 1,
                     is_first_page=(page_num == 0)
                 )
 
                 if page_num == 0 and page_result.get('bank'):
                     bank_info = page_result
-
                 if page_result.get('transactions'):
                     all_transactions.extend(page_result['transactions'])
 
             doc.close()
-
             result = bank_info or {}
             result['transactions'] = all_transactions
-            result = self._calculate_totals(result)
-
-            return result
+            return self._calculate_totals(result)
 
         except ImportError:
             raise ValueError(
@@ -349,14 +620,14 @@ class BankStatementAIParser:
 
         # Order matters — check specific patterns first
         bank_patterns = [
-            (['בנק לאומי', 'לאומי'], 'LEUMI', 'בנק לאומי'),
+            (['בנק לאומי', 'לאומי', 'תאריך הנפקה | בנק'], 'LEUMI', 'בנק לאומי'),
             (['הפועלים', 'פועלים', 'poalim'], 'HAPOALIM', 'בנק הפועלים'),
-            (['דיסקונט', 'discount'], 'DISCOUNT', 'בנק דיסקונט'),
+            (['דיסקונט', 'discount', 'בנקאות מסחרית'], 'DISCOUNT', 'בנק דיסקונט'),
             (['ירושלים'], 'JERUSALEM', 'בנק ירושלים'),
-            (['מזרחי', 'טפחות', 'mizrahi'], 'MIZRAHI', 'בנק מזרחי טפחות'),
-            (['הבינלאומי', 'fibi'], 'INTERNATIONAL', 'הבנק הבינלאומי'),
+            (['מזרחי', 'טפחות', 'mizrahi', 'יתרה ותנועות בחשבון'], 'MIZRAHI', 'בנק מזרחי טפחות'),
+            (['הבינלאומי', 'fibi', 'fibi.co.il'], 'INTERNATIONAL', 'הבנק הבינלאומי'),
             (['אוצר החייל', 'otsar'], 'OTSAR', 'בנק אוצר החייל'),
-            (['מרכנתיל', 'mercantile'], 'MERCANTILE', 'בנק מרכנתיל'),
+            (['מרכנתיל', 'mercantile', 'סניף720'], 'MERCANTILE', 'בנק מרכנתיל'),
             (['יהב', 'yahav'], 'YAHAV', 'בנק יהב'),
         ]
 

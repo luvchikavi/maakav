@@ -178,8 +178,167 @@ class GuaranteeParserService:
         return {'items': items, 'total_balance': float(total), 'warnings': warnings}
 
     def _parse_pdf(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """Parse PDF guarantee via Claude Vision."""
+        """Parse PDF guarantee — text extraction first, AI vision fallback."""
+        try:
+            import fitz  # PyMuPDF
+        except ImportError:
+            raise ValueError("PyMuPDF is not installed. pip install pymupdf")
+
+        doc = fitz.open(stream=file_content, filetype="pdf")
+        full_text = ""
+        for page in doc:
+            full_text += page.get_text() + "\n"
+        doc.close()
+
+        # If PDF has extractable text, parse deterministically
+        if len(full_text.strip()) > 50:
+            try:
+                result = self._parse_guarantee_pdf_text(full_text)
+                if result and result.get('items'):
+                    logger.info(f"Guarantee PDF text parser extracted {len(result['items'])} items")
+                    return result
+            except Exception as e:
+                logger.warning(f"Guarantee PDF text parser failed: {e}")
+
+        # Fallback to AI
         return self._parse_with_ai(file_content, filename, 'pdf')
+
+    def _parse_guarantee_pdf_text(self, text: str) -> Dict[str, Any]:
+        """Deterministic parser for guarantee PDFs with extractable text.
+
+        Guarantee statements typically list items in a table with columns:
+        buyer name, guarantee type, amount, indexed balance, expiry date, apartment number.
+        """
+        import re
+
+        items = []
+        warnings = []
+        total = Decimal('0')
+
+        # Strategy: find lines with monetary amounts and dates that look like guarantee items.
+        # Each guarantee item usually has: a name, a monetary amount, and a date.
+
+        lines = text.split('\n')
+        lines = [l.strip() for l in lines if l.strip()]
+
+        # Detect guarantee type context from text
+        def detect_type_from_context(nearby_text: str) -> str:
+            nearby_lower = nearby_text.lower()
+            for key, val in GUARANTEE_TYPE_MAP.items():
+                if key in nearby_text:
+                    return val
+            return 'sale_law'  # Default for bank monitoring reports
+
+        # Pattern 1: Tabular data — look for rows with amounts and dates
+        # Common Israeli guarantee statement format:
+        # buyer_name | apt_num | amount | indexed_amount | expiry_date
+        amount_pattern = re.compile(r'([\d,]+\.?\d{0,2})')
+        date_pattern = re.compile(r'(\d{2}[./]\d{2}[./]\d{4})')
+
+        # Try to find a header row to understand structure
+        header_idx = None
+        for i, line in enumerate(lines):
+            # Header indicators
+            if any(kw in line for kw in ['מוטב', 'שם הרוכש', 'שם הקונה']) and \
+               any(kw in line for kw in ['סכום', 'יתרה', 'ערבות']):
+                header_idx = i
+                break
+
+        # If we found a header, parse subsequent rows
+        if header_idx is not None:
+            for i in range(header_idx + 1, len(lines)):
+                line = lines[i]
+                # Skip empty-looking lines, footers, etc.
+                if len(line) < 5:
+                    continue
+                if any(kw in line for kw in ['סה"כ', 'סך הכל', 'עמוד', 'הערות', 'page']):
+                    continue
+
+                # Extract amounts from line
+                amounts = amount_pattern.findall(line)
+                amounts = [float(a.replace(',', '')) for a in amounts if float(a.replace(',', '')) > 100]
+
+                dates = date_pattern.findall(line)
+
+                if not amounts:
+                    continue
+
+                # Extract name: text before the first number
+                first_num_pos = re.search(r'\d', line)
+                name = line[:first_num_pos.start()].strip() if first_num_pos else ''
+
+                # Extract apartment number: small number (1-999)
+                apt_num = ''
+                small_nums = re.findall(r'\b(\d{1,3})\b', line)
+                for sn in small_nums:
+                    if 1 <= int(sn) <= 999 and float(sn) not in amounts:
+                        apt_num = sn
+                        break
+
+                g_type = detect_type_from_context(text[:500])
+                orig = amounts[0] if len(amounts) >= 1 else 0
+                bal = amounts[1] if len(amounts) >= 2 else orig
+                total += Decimal(str(bal))
+
+                expiry = None
+                if dates:
+                    expiry = self._parse_date(dates[0])
+
+                items.append({
+                    'buyer_name': name,
+                    'guarantee_type': g_type,
+                    'original_amount': orig,
+                    'indexed_balance': bal,
+                    'expiry_date': expiry,
+                    'apartment_number': apt_num,
+                    'notes': '',
+                })
+        else:
+            # No header found — try a more aggressive scan
+            # Look for lines with Hebrew names + amounts
+            for i, line in enumerate(lines):
+                if len(line) < 10:
+                    continue
+
+                amounts = amount_pattern.findall(line)
+                amounts = [float(a.replace(',', '')) for a in amounts if float(a.replace(',', '')) > 1000]
+                if not amounts:
+                    continue
+
+                # Check if line has Hebrew text (likely a name)
+                has_hebrew = bool(re.search(r'[\u0590-\u05FF]', line))
+                if not has_hebrew:
+                    continue
+
+                first_num_pos = re.search(r'\d', line)
+                name = line[:first_num_pos.start()].strip() if first_num_pos else ''
+                if not name or len(name) < 3:
+                    continue
+
+                dates = date_pattern.findall(line)
+                g_type = detect_type_from_context(text[:500])
+                orig = amounts[0]
+                bal = amounts[1] if len(amounts) >= 2 else orig
+                total += Decimal(str(bal))
+
+                items.append({
+                    'buyer_name': name,
+                    'guarantee_type': g_type,
+                    'original_amount': orig,
+                    'indexed_balance': bal,
+                    'expiry_date': self._parse_date(dates[0]) if dates else None,
+                    'apartment_number': '',
+                    'notes': '',
+                })
+
+        if not items:
+            warnings.append('לא נמצאו ערבויות בטקסט המסמך')
+
+        return {
+            'items': items,
+            'total_balance': float(total),
+            'warnings': warnings or ['Parsed from PDF text (no AI)'],
+        }
 
     def _parse_with_ai(self, file_content: bytes, filename: str, source: str) -> Dict[str, Any]:
         """Use Claude Vision to parse guarantee document."""
