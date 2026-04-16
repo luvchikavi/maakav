@@ -723,12 +723,22 @@ class BankStatementAIParser:
             response_text = message.content[0].text
             return self._parse_claude_response(response_text)
 
+        except ValueError as e:
+            # Missing API key or configuration error — surface as error
+            logger.error(f"Configuration error for Claude API: {str(e)}")
+            return {
+                "transactions": [],
+                "error": str(e),
+                "warnings": [f"AI parsing error: {str(e)}"],
+                "confidence": 0,
+            }
         except Exception as e:
             logger.error(f"Error calling Claude API: {str(e)}")
             return {
                 "transactions": [],
+                "error": f"AI parsing error: {str(e)}",
                 "warnings": [f"AI parsing error: {str(e)}"],
-                "confidence": 0
+                "confidence": 0,
             }
 
     def _analyze_excel_with_claude(self, df, detected_bank: Optional[str]) -> Dict[str, Any]:
@@ -798,6 +808,15 @@ class BankStatementAIParser:
             response_text = message.content[0].text
             return self._parse_claude_response(response_text)
 
+        except ValueError as e:
+            # Missing API key or configuration error
+            logger.error(f"Configuration error for Claude API: {str(e)}")
+            return {
+                "transactions": [],
+                "error": str(e),
+                "warnings": [f"AI parsing error: {str(e)}"],
+                "confidence": 0,
+            }
         except Exception as e:
             logger.error(f"Error calling Claude API for Excel: {str(e)}")
             return self._fallback_excel_parse(df, detected_bank)

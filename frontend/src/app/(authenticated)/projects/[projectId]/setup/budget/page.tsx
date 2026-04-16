@@ -57,9 +57,7 @@ export default function BudgetSetupPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const { data } = await api.post(`/projects/${projectId}/setup/budget/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const { data } = await api.post(`/projects/${projectId}/setup/budget/upload`, formData);
       setUploadResult({ items_count: data.items_count, total_budget: data.total_budget });
       queryClient.invalidateQueries({ queryKey: ["budget", projectId] });
       queryClient.invalidateQueries({ queryKey: ["setup-status", projectId] });

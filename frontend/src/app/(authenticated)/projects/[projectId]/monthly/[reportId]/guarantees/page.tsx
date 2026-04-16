@@ -67,7 +67,6 @@ export default function GuaranteesStep() {
       const { data } = await api.post(
         `/projects/${projectId}/monthly-reports/${reportId}/guarantees/upload`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
       );
       setUploadResult({ items_count: data.items_count, warnings: data.warnings || [] });
       qc.invalidateQueries({ queryKey: ["guarantees", reportId] });

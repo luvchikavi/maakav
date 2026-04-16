@@ -92,7 +92,7 @@ class BudgetTrackingLine(Base):
         Calculate all derived columns. Ported from Nectra's BudgetTrackingLineItem.calculate_all().
         Source: Nectra/backend/apps/budget/models/monthly_budget_tracking.py:413-469
         """
-        if self.is_index_linked and base_index and base_index != 0:
+        if self.is_index_linked and base_index and current_index and base_index != 0:
             index_ratio = current_index / base_index
             inverse_ratio = base_index / current_index
         else:

@@ -85,7 +85,6 @@ export default function ChecksStep() {
       const { data } = await api.post(
         `/projects/${projectId}/monthly-reports/${reportId}/checks/upload`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
       );
       setUploadResult(data);
       qc.invalidateQueries({ queryKey: ["checks", reportId] });

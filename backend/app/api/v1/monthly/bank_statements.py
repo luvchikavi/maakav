@@ -102,6 +102,8 @@ async def upload_bank_statement(
         )
         db.add(bank_tx)
 
+    await db.flush()  # Ensure transactions have IDs before auto-classification
+
     # Update report status
     if report.status == "draft":
         report.status = "data_entry"

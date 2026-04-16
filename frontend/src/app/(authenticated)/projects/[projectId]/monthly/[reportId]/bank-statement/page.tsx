@@ -58,6 +58,7 @@ export default function BankStatementStep() {
   });
 
   const handleUpload = useCallback(async (file: File) => {
+    setUploadResult(null);
     setUploading(true);
     try {
       const formData = new FormData();
@@ -65,7 +66,6 @@ export default function BankStatementStep() {
       const { data } = await api.post(
         `/projects/${projectId}/monthly-reports/${reportId}/bank-statements/upload`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
       );
       setUploadResult({
         transactions_count: data.transactions_count,

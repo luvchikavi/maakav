@@ -126,7 +126,6 @@ export default function ProjectPage() {
       const { data } = await api.post(
         `/projects/${projectId}/setup/bulk-upload/preview`,
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
       );
       setBulkPreview(data);
     } catch (err: any) {

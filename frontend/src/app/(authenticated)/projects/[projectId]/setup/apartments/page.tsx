@@ -65,9 +65,7 @@ export default function ApartmentsSetupPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const { data } = await api.post(`/projects/${projectId}/setup/apartments/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const { data } = await api.post(`/projects/${projectId}/setup/apartments/upload`, formData);
       setUploadResult({ imported: data.imported });
       queryClient.invalidateQueries({ queryKey: ["apartments", projectId] });
       queryClient.invalidateQueries({ queryKey: ["setup-status", projectId] });

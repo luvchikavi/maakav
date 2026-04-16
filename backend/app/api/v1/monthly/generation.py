@@ -58,6 +58,8 @@ async def generate_report(
     try:
         # Budget
         snapshot = await calculate_budget_tracking(project_id, report_id, db)
+        if not snapshot:
+            raise HTTPException(status_code=400, detail="יש להריץ חישובי תקציב קודם")
         lines = (await db.execute(
             select(BudgetTrackingLine).where(BudgetTrackingLine.snapshot_id == snapshot.id).order_by(BudgetTrackingLine.display_order)
         )).scalars().all()
@@ -86,6 +88,8 @@ async def generate_report(
 
         # VAT
         vat = await calculate_vat(project_id, report_id, db)
+        if not vat:
+            raise HTTPException(status_code=400, detail="יש להריץ חישובי מע\"מ קודם")
         calc_results["vat"] = {k: str(v) for k, v in {
             "transactions_total": vat.transactions_total, "output_vat": vat.output_vat,
             "inputs_total": vat.inputs_total, "input_vat": vat.input_vat,
@@ -94,6 +98,8 @@ async def generate_report(
 
         # Equity
         eq = await calculate_equity(project_id, report_id, db)
+        if not eq:
+            raise HTTPException(status_code=400, detail="יש להריץ חישובי הון עצמי קודם")
         calc_results["equity"] = {k: str(v) for k, v in {
             "required_amount": eq.required_amount, "total_deposits": eq.total_deposits,
             "total_withdrawals": eq.total_withdrawals, "current_balance": eq.current_balance, "gap": eq.gap,
@@ -119,6 +125,8 @@ async def generate_report(
 
         # Profitability
         prof = await calculate_profitability(project_id, report_id, db)
+        if not prof:
+            raise HTTPException(status_code=400, detail="יש להריץ חישובי רווחיות קודם")
         calc_results["profitability"] = {k: str(v) for k, v in {
             "income_report_0": prof.income_report_0, "cost_report_0": prof.cost_report_0,
             "profit_report_0": prof.profit_report_0, "profit_percent_report_0": prof.profit_percent_report_0,
@@ -128,6 +136,8 @@ async def generate_report(
 
         # Sources & Uses
         su = await calculate_sources_uses(project_id, report_id, db)
+        if not su:
+            raise HTTPException(status_code=400, detail="יש להריץ חישובי מקורות ושימושים קודם")
         calc_results["sources_uses"] = {k: str(v) for k, v in {
             "source_equity": su.source_equity, "source_sales_receipts": su.source_sales_receipts,
             "source_bank_credit": su.source_bank_credit, "source_vat_refunds": su.source_vat_refunds,

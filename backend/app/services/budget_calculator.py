@@ -13,13 +13,13 @@ Then calls BudgetTrackingLine.calculate_all() to compute all derived columns.
 
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 
 from ..models.project import Project
 from ..models.monthly_report import MonthlyReport
 from ..models.budget import BudgetCategory, BudgetLineItem, CategoryType
 from ..models.budget_tracking import BudgetTrackingSnapshot, BudgetTrackingLine
-from ..models.bank_statement import BankTransaction, TransactionCategory
+from ..models.bank_statement import BankTransaction, TransactionCategory, TransactionType
 
 # Map bank transaction categories → budget tracking categories
 TX_TO_BUDGET_MAP = {
@@ -98,7 +98,7 @@ async def calculate_budget_tracking(
         )
         .where(
             BankTransaction.monthly_report_id == report_id,
-            BankTransaction.transaction_type == "debit",
+            BankTransaction.transaction_type == TransactionType.DEBIT,
             BankTransaction.category.isnot(None),
         )
         .group_by(BankTransaction.category)
@@ -129,14 +129,10 @@ async def calculate_budget_tracking(
     )).scalar_one_or_none()
 
     if existing:
+        # Delete lines first, then the snapshot
         await db.execute(
-            select(BudgetTrackingLine).where(BudgetTrackingLine.snapshot_id == existing.id)
+            delete(BudgetTrackingLine).where(BudgetTrackingLine.snapshot_id == existing.id)
         )
-        # Delete lines first
-        for line in (await db.execute(
-            select(BudgetTrackingLine).where(BudgetTrackingLine.snapshot_id == existing.id)
-        )).scalars().all():
-            await db.delete(line)
         await db.delete(existing)
         await db.flush()
 
