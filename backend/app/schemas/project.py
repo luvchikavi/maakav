@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class ProjectCreate(BaseModel):
@@ -13,6 +13,13 @@ class ProjectCreate(BaseModel):
     bank: str | None = None
     project_account_number: str | None = None
     project_type: str | None = None
+
+    @field_validator("bank", "project_type", "address", "city", "developer_name", "project_account_number", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v: str | None) -> str | None:
+        if v == "":
+            return None
+        return v
 
 
 class ProjectUpdate(BaseModel):
