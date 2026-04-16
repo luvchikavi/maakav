@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import api from "@/lib/api";
@@ -13,6 +13,23 @@ const BANKS = [
   { value: "international", label: "הבנק הבינלאומי" },
   { value: "jerusalem", label: "בנק ירושלים" },
   { value: "other", label: "אחר" },
+];
+
+const ISRAELI_CITIES = [
+  "ירושלים", "תל אביב-יפו", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה",
+  "באר שבע", "בני ברק", "חולון", "רמת גן", "אשקלון", "רחובות", "בת ים", "הרצליה",
+  "כפר סבא", "חדרה", "מודיעין-מכבים-רעות", "לוד", "נצרת", "רמלה", "רעננה",
+  "הוד השרון", "גבעתיים", "קרית אתא", "נהריה", "עכו", "אילת", "קרית גת",
+  "קרית מוצקין", "כרמיאל", "צפת", "טבריה", "עפולה", "נתיבות", "אור יהודה", "יבנה",
+  "אור עקיבא", "ערד", "דימונה", "מגדל העמק", "שדרות", "קרית ביאליק", "קרית ים",
+  "קרית שמונה", "ראש העין", "נס ציונה", "גבעת שמואל", "יהוד-מונוסון", "טירת כרמל",
+  "מעלה אדומים", "ביתר עילית", "מודיעין עילית", "אלעד", "גני תקווה", "קדימה-צורן",
+  "פרדס חנה-כרכור", "זכרון יעקב", "בנימינה-גבעת עדה", "עתלית", "חריש", "שוהם",
+  "גדרה", "קרית עקרון", "באקה אל-גרבייה", "אום אל-פחם", "טייבה", "כפר קאסם",
+  "סכנין", "מגאר", "שפרעם", "טמרה", "דאלית אל-כרמל", "ג'סר א-זרקא", "ג'לג'וליה",
+  "קלנסווה", "רהט", "ירוחם", "מצפה רמון", "אופקים", "קרית מלאכי", "גן יבנה",
+  "עומר", "להבים", "מיתר", "רמת ישי", "יוקנעם", "מבשרת ציון", "בית שמש",
+  "בית שאן", "אריאל", "גבעת זאב",
 ];
 
 const PROJECT_TYPES = [
@@ -79,7 +96,7 @@ export default function NewProjectPage() {
         <Field label="שם הפרויקט *" value={form.project_name} onChange={(v) => set("project_name", v)} placeholder='לדוגמה: רש"י 12 רמת גן' />
         <div className="grid grid-cols-2 gap-4">
           <Field label="כתובת" value={form.address} onChange={(v) => set("address", v)} placeholder={"רח' רש\"י 12"} />
-          <Field label="עיר" value={form.city} onChange={(v) => set("city", v)} placeholder="רמת גן" />
+          <CityAutocomplete value={form.city} onChange={(v) => set("city", v)} />
         </div>
         <Field label="שם היזם" value={form.developer_name} onChange={(v) => set("developer_name", v)} placeholder='נווה שוסטר בע"מ' />
 
@@ -140,6 +157,70 @@ function SelectField({
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function CityAutocomplete({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered =
+    value.length >= 1
+      ? ISRAELI_CITIES.filter((c) => c.includes(value)).slice(0, 8)
+      : [];
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">עיר</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (value.length >= 1) setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
+        placeholder="רמת גן"
+        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg max-h-64 overflow-y-auto">
+          {filtered.map((city) => (
+            <li
+              key={city}
+              onMouseDown={() => {
+                onChange(city);
+                setOpen(false);
+              }}
+              className="px-4 py-2.5 text-gray-900 cursor-pointer hover:bg-gray-50 transition first:rounded-t-xl last:rounded-b-xl"
+            >
+              {city}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

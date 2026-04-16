@@ -3,8 +3,15 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Save, CheckCircle, TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, CheckCircle, TrendingUp, RefreshCw, AlertCircle } from "lucide-react";
 import api from "@/lib/api";
+
+interface CBSIndex {
+  index_value: number;
+  period: string;
+  period_display: string;
+  source: string;
+}
 
 export default function IndexStep() {
   const { projectId, reportId } = useParams<{ projectId: string; reportId: string }>();
@@ -23,6 +30,14 @@ export default function IndexStep() {
     queryFn: async () => (await api.get(`/projects/${projectId}`)).data,
   });
 
+  // Auto-fetch latest CBS index
+  const { data: cbsIndex, isLoading: cbsLoading, error: cbsError, refetch: refetchCbs } = useQuery<CBSIndex>({
+    queryKey: ["cbs-index", projectId, reportId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/monthly-reports/${reportId}/index/latest`)).data,
+    retry: false,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
   useEffect(() => {
     if (report?.current_index) setIndexValue(report.current_index.toString());
   }, [report]);
@@ -39,12 +54,61 @@ export default function IndexStep() {
     },
   });
 
+  const applyCbsIndex = () => {
+    if (cbsIndex?.index_value) {
+      setIndexValue(cbsIndex.index_value.toString());
+    }
+  };
+
   return (
     <div className="max-w-lg mx-auto">
       <div className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
         <div className="flex items-center gap-3 mb-2">
           <TrendingUp size={24} className="text-primary" />
           <h2 className="text-lg font-bold text-gray-900">עדכון מדד תשומות בנייה</h2>
+        </div>
+
+        {/* CBS Auto-fetch Card */}
+        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-blue-800">מדד אחרון מהלמ&quot;ס</p>
+            <button
+              onClick={() => refetchCbs()}
+              disabled={cbsLoading}
+              className="text-blue-600 hover:text-blue-800 transition"
+              title="רענון"
+            >
+              <RefreshCw size={16} className={cbsLoading ? "animate-spin" : ""} />
+            </button>
+          </div>
+
+          {cbsLoading && (
+            <p className="text-sm text-blue-600">טוען מדד עדכני...</p>
+          )}
+
+          {cbsError && (
+            <div className="flex items-center gap-2 text-sm text-amber-700">
+              <AlertCircle size={14} />
+              <span>לא ניתן לטעון מדד אוטומטית — יש להזין ידנית</span>
+            </div>
+          )}
+
+          {cbsIndex && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-2xl font-bold text-blue-900">{cbsIndex.index_value}</p>
+                  <p className="text-xs text-blue-600">{cbsIndex.period_display} &middot; {cbsIndex.source}</p>
+                </div>
+                <button
+                  onClick={applyCbsIndex}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 transition"
+                >
+                  אשר והחל
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {project?.base_index && (

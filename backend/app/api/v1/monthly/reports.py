@@ -5,6 +5,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+import httpx
 
 from ....database import get_db
 from ....models.user import User
@@ -16,6 +17,13 @@ from ....schemas.monthly import MonthlyReportCreate, MonthlyReportResponse, Data
 from ....core.dependencies import get_current_user
 
 router = APIRouter(tags=["monthly-reports"])
+
+CBS_INDEX_URL = "https://apis.cbs.gov.il/series/data/list?id=120010&format=json&last=6"
+CBS_TIMEOUT_SECONDS = 10
+HEBREW_MONTHS = [
+    "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
+    "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
+]
 
 
 @router.get("/projects/{project_id}/monthly-reports", response_model=list[MonthlyReportResponse])
@@ -179,6 +187,62 @@ async def update_index(
     report.current_index = current_index
     await db.commit()
     return {"ok": True, "current_index": str(current_index)}
+
+
+@router.get("/projects/{project_id}/monthly-reports/{report_id}/index/latest")
+async def fetch_latest_cbs_index(
+    project_id: int,
+    report_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch the latest construction input index (מדד תשומות בנייה) from the CBS API."""
+    await _verify_project(project_id, user.firm_id, db)
+
+    report = (await db.execute(
+        select(MonthlyReport).where(MonthlyReport.id == report_id, MonthlyReport.project_id == project_id)
+    )).scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="הדוח לא נמצא")
+
+    try:
+        async with httpx.AsyncClient(timeout=CBS_TIMEOUT_SECONDS) as client:
+            response = await client.get(CBS_INDEX_URL)
+            response.raise_for_status()
+    except httpx.TimeoutException:
+        raise HTTPException(
+            status_code=502,
+            detail="שרת הלמ\"ס לא הגיב בזמן. נסה שוב מאוחר יותר.",
+        )
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=502,
+            detail="לא ניתן להתחבר לשרת הלמ\"ס. נסה שוב מאוחר יותר.",
+        )
+
+    try:
+        data = response.json()
+        observations = data["DataSet"]["Series"][0]["obs"]
+        # The first observation is the most recent
+        latest = observations[0]
+        value = latest["Value"]
+        period = latest["TimePeriod"]  # e.g. "2026-01"
+
+        year, month_str = period.split("-")
+        month_num = int(month_str)
+        month_name_heb = HEBREW_MONTHS[month_num - 1]
+
+        return {
+            "index_value": value,
+            "period": period,
+            "period_display": f"{month_name_heb} {year}",
+            "source": "הלשכה המרכזית לסטטיסטיקה",
+        }
+    except (KeyError, IndexError, ValueError) as e:
+        raise HTTPException(
+            status_code=502,
+            detail="תבנית התגובה מהלמ\"ס אינה תקינה. נסה שוב מאוחר יותר.",
+        )
 
 
 async def _verify_project(project_id: int, firm_id: int, db: AsyncSession) -> Project:
