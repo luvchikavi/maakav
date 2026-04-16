@@ -141,7 +141,11 @@ export default function DashboardPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {projects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50/50 transition">
+                  <tr
+                    key={project.id}
+                    className="hover:bg-gray-50/50 transition cursor-pointer"
+                    onClick={() => (window.location.href = `/projects/${project.id}`)}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
