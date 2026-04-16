@@ -18,7 +18,10 @@ from ....core.dependencies import get_current_user
 
 router = APIRouter(tags=["monthly-reports"])
 
-CBS_INDEX_URL = "https://apis.cbs.gov.il/series/data/list?id=120010&format=json&last=6"
+# CBS Construction Input Index (מדד תשומות בנייה למגורים)
+# TODO: The CBS API series ID for construction input index needs to be identified.
+# For now, this endpoint returns a helpful message directing users to the CBS website.
+CBS_INDEX_URL = ""
 CBS_TIMEOUT_SECONDS = 10
 HEBREW_MONTHS = [
     "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
@@ -205,44 +208,13 @@ async def fetch_latest_cbs_index(
     if not report:
         raise HTTPException(status_code=404, detail="הדוח לא נמצא")
 
-    try:
-        async with httpx.AsyncClient(timeout=CBS_TIMEOUT_SECONDS) as client:
-            response = await client.get(CBS_INDEX_URL)
-            response.raise_for_status()
-    except httpx.TimeoutException:
-        raise HTTPException(
-            status_code=502,
-            detail="שרת הלמ\"ס לא הגיב בזמן. נסה שוב מאוחר יותר.",
-        )
-    except httpx.HTTPError:
-        raise HTTPException(
-            status_code=502,
-            detail="לא ניתן להתחבר לשרת הלמ\"ס. נסה שוב מאוחר יותר.",
-        )
-
-    try:
-        data = response.json()
-        observations = data["DataSet"]["Series"][0]["obs"]
-        # The first observation is the most recent
-        latest = observations[0]
-        value = latest["Value"]
-        period = latest["TimePeriod"]  # e.g. "2026-01"
-
-        year, month_str = period.split("-")
-        month_num = int(month_str)
-        month_name_heb = HEBREW_MONTHS[month_num - 1]
-
-        return {
-            "index_value": value,
-            "period": period,
-            "period_display": f"{month_name_heb} {year}",
-            "source": "הלשכה המרכזית לסטטיסטיקה",
-        }
-    except (KeyError, IndexError, ValueError) as e:
-        raise HTTPException(
-            status_code=502,
-            detail="תבנית התגובה מהלמ\"ס אינה תקינה. נסה שוב מאוחר יותר.",
-        )
+    # CBS API integration pending — direct the user to enter manually
+    # TODO: Once the correct CBS series ID for מדד תשומות בנייה is found,
+    # re-enable auto-fetch here.
+    raise HTTPException(
+        status_code=503,
+        detail="שירות המדד האוטומטי בהקמה. יש להזין את המדד ידנית מאתר הלמ\"ס.",
+    )
 
 
 async def _verify_project(project_id: int, firm_id: int, db: AsyncSession) -> Project:
