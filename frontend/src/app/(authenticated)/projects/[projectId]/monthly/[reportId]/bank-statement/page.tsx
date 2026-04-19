@@ -59,6 +59,7 @@ export default function BankStatementStep() {
     warnings: string[];
   } | null>(null);
   const [approved, setApproved] = useState(false);
+  const [selectedTxIds, setSelectedTxIds] = useState<Set<number>>(new Set());
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["transactions", reportId],
@@ -153,6 +154,42 @@ export default function BankStatementStep() {
       queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
     },
   });
+
+  const bulkApproveMutation = useMutation({
+    mutationFn: async (pairs: { txId: number; category: string }[]) => {
+      await Promise.all(
+        pairs.map(({ txId, category }) =>
+          api.patch(`/projects/${projectId}/monthly-reports/${reportId}/transactions/${txId}`, { category })
+        )
+      );
+      return pairs.length;
+    },
+    onSuccess: () => {
+      setSelectedTxIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["transactions", reportId] });
+      queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
+    },
+  });
+
+  const selectableTxIds = transactions.filter((t) => !t.category && t.ai_suggested_category).map((t) => t.id);
+  const allSelectableSelected = selectableTxIds.length > 0 && selectableTxIds.every((id) => selectedTxIds.has(id));
+  const toggleRowSelection = (txId: number) => {
+    setSelectedTxIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(txId)) next.delete(txId);
+      else next.add(txId);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelectedTxIds(allSelectableSelected ? new Set() : new Set(selectableTxIds));
+  };
+  const handleBulkApprove = () => {
+    const pairs = transactions
+      .filter((t) => selectedTxIds.has(t.id) && !t.category && t.ai_suggested_category)
+      .map((t) => ({ txId: t.id, category: t.ai_suggested_category as string }));
+    if (pairs.length > 0) bulkApproveMutation.mutate(pairs);
+  };
 
   const unclassifiedCount = transactions.filter((t) => !t.category).length;
   const totalCredits = transactions.filter((t) => t.transaction_type === "credit").reduce((s, t) => s + Number(t.amount), 0);
@@ -354,16 +391,28 @@ export default function BankStatementStep() {
               <RefreshCw size={14} />
               העלה תדפיס אחר
             </button>
-            {unclassifiedCount > 0 && (
-              <button
-                onClick={() => autoClassifyMutation.mutate()}
-                disabled={autoClassifyMutation.isPending}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition disabled:opacity-50"
-              >
-                <Sparkles size={16} />
-                {autoClassifyMutation.isPending ? "מסווג..." : `סווג אוטומטי (${unclassifiedCount} תנועות)`}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedTxIds.size > 0 && (
+                <button
+                  onClick={handleBulkApprove}
+                  disabled={bulkApproveMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition disabled:opacity-50"
+                >
+                  <CheckCircle size={16} />
+                  {bulkApproveMutation.isPending ? "מאשר..." : `אשר סיווג AI למסומנים (${selectedTxIds.size})`}
+                </button>
+              )}
+              {unclassifiedCount > 0 && (
+                <button
+                  onClick={() => autoClassifyMutation.mutate()}
+                  disabled={autoClassifyMutation.isPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 transition disabled:opacity-50"
+                >
+                  <Sparkles size={16} />
+                  {autoClassifyMutation.isPending ? "מסווג..." : `סווג אוטומטי (${unclassifiedCount} תנועות)`}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Transaction table */}
@@ -372,6 +421,17 @@ export default function BankStatementStep() {
               <table className="w-full">
                 <thead>
                   <tr className="text-xs text-gray-500 bg-gray-50 border-b">
+                    <th className="w-10 px-2 py-3">
+                      {selectableTxIds.length > 0 && (
+                        <input
+                          type="checkbox"
+                          checked={allSelectableSelected}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                          title="בחר הכל"
+                        />
+                      )}
+                    </th>
                     <th className="text-right px-4 py-3 font-medium">תאריך</th>
                     <th className="text-right px-4 py-3 font-medium">תיאור</th>
                     <th className="text-left px-4 py-3 font-medium">סכום</th>
@@ -381,8 +441,20 @@ export default function BankStatementStep() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {transactions.map((tx) => (
+                  {transactions.map((tx) => {
+                    const isSelectable = !tx.category && !!tx.ai_suggested_category;
+                    return (
                     <tr key={tx.id} className={`hover:bg-gray-50/50 transition ${!tx.category ? "bg-amber-50/30" : ""}`}>
+                      <td className="px-2 py-3 text-center">
+                        {isSelectable && (
+                          <input
+                            type="checkbox"
+                            checked={selectedTxIds.has(tx.id)}
+                            onChange={() => toggleRowSelection(tx.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                          />
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{formatDate(tx.transaction_date)}</td>
                       <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate">
                         {tx.description}
@@ -449,7 +521,8 @@ export default function BankStatementStep() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
