@@ -75,7 +75,8 @@ export default function BankStatementStep() {
       queryClient.invalidateQueries({ queryKey: ["transactions", reportId] });
       queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "שגיאה בהעלאת הקובץ");
+      const detail = err?.response?.data?.detail;
+      alert(typeof detail === "string" ? detail : "שגיאה בהעלאת הקובץ");
     } finally {
       setUploading(false);
     }

@@ -72,7 +72,8 @@ export default function GuaranteesStep() {
       qc.invalidateQueries({ queryKey: ["guarantees", reportId] });
       qc.invalidateQueries({ queryKey: ["completeness", reportId] });
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "שגיאה בהעלאת הקובץ");
+      const detail = err?.response?.data?.detail;
+      alert(typeof detail === "string" ? detail : "שגיאה בהעלאת הקובץ");
     } finally {
       setUploading(false);
     }

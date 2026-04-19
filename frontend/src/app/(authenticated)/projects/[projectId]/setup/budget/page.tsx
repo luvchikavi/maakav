@@ -62,7 +62,8 @@ export default function BudgetSetupPage() {
       queryClient.invalidateQueries({ queryKey: ["budget", projectId] });
       queryClient.invalidateQueries({ queryKey: ["setup-status", projectId] });
     } catch (err: any) {
-      alert(err?.response?.data?.detail || "שגיאה בהעלאת הקובץ");
+      const detail = err?.response?.data?.detail;
+      alert(typeof detail === "string" ? detail : "שגיאה בהעלאת הקובץ");
     } finally {
       setUploading(false);
     }
