@@ -463,6 +463,7 @@ class BankStatementAIParser:
             doc = fitz.open(stream=file_content, filetype="pdf")
             all_transactions = []
             bank_info = None
+            first_page_error: Optional[str] = None
 
             for page_num in range(min(3, len(doc))):
                 page = doc[page_num]
@@ -477,12 +478,26 @@ class BankStatementAIParser:
                     is_first_page=(page_num == 0)
                 )
 
-                if page_num == 0 and page_result.get('bank'):
-                    bank_info = page_result
+                if page_num == 0:
+                    if page_result.get('error'):
+                        first_page_error = page_result['error']
+                    if page_result.get('bank'):
+                        bank_info = page_result
                 if page_result.get('transactions'):
                     all_transactions.extend(page_result['transactions'])
 
             doc.close()
+
+            # If the first page errored and we got nothing, surface the error
+            # rather than masking it as an "unsupported format" warning.
+            if first_page_error and not all_transactions:
+                return {
+                    'transactions': [],
+                    'error': first_page_error,
+                    'warnings': [first_page_error],
+                    'confidence': 0,
+                }
+
             result = bank_info or {}
             result['transactions'] = all_transactions
             return self._calculate_totals(result)
@@ -1003,6 +1018,42 @@ class BankStatementAIParser:
                 "warnings": [f"AI parsing error: {str(e)}"],
                 "confidence": 0,
             }
+        except anthropic.AuthenticationError as e:
+            logger.error(f"Anthropic API authentication failed: {str(e)}")
+            msg = (
+                "שירות ה-AI אינו זמין: מפתח ה-API של Anthropic אינו תקין או פג תוקפו. "
+                "יש לעדכן את ANTHROPIC_API_KEY בקובץ ה-.env ולהפעיל מחדש את השרת."
+            )
+            return {
+                "transactions": [],
+                "error": msg,
+                "warnings": [msg],
+                "confidence": 0,
+            }
+        except anthropic.BadRequestError as e:
+            logger.error(f"Anthropic API bad request: {str(e)}")
+            if "credit balance" in str(e).lower():
+                msg = (
+                    "שירות ה-AI אינו זמין: אין יתרת קרדיטים בחשבון Anthropic. "
+                    "יש להוסיף קרדיטים ב-https://console.anthropic.com/settings/billing"
+                )
+            else:
+                msg = f"שגיאת בקשה ל-AI: {str(e)}"
+            return {
+                "transactions": [],
+                "error": msg,
+                "warnings": [msg],
+                "confidence": 0,
+            }
+        except anthropic.RateLimitError as e:
+            logger.error(f"Anthropic API rate limited: {str(e)}")
+            msg = "שירות ה-AI עמוס כרגע, יש לנסות שוב בעוד מספר דקות."
+            return {
+                "transactions": [],
+                "error": msg,
+                "warnings": [msg],
+                "confidence": 0,
+            }
         except Exception as e:
             logger.error(f"Error calling Claude API: {str(e)}")
             return {
@@ -1226,7 +1277,7 @@ class BankStatementAIParser:
         """Calculate total credits and debits from transactions"""
         transactions = result.get('transactions', [])
 
-        if not transactions:
+        if not transactions and not result.get('error'):
             warnings = result.get('warnings', [])
             warnings.append("לא זוהו תנועות בדף החשבון - ייתכן שהקובץ ריק או בפורמט לא נתמך")
             result['warnings'] = warnings
