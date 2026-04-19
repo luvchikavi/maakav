@@ -119,14 +119,19 @@ export default function BankStatementStep() {
     triggerFileSelect();
   };
 
+  const invalidateBudgetDependentQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["transactions", reportId] });
+    queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
+    queryClient.invalidateQueries({ queryKey: ["exposure", reportId] });
+    queryClient.invalidateQueries({ queryKey: ["cashflow", reportId] });
+    queryClient.invalidateQueries({ queryKey: ["guarantee-validation", reportId] });
+  };
+
   const classifyMutation = useMutation({
     mutationFn: async ({ txId, category }: { txId: number; category: string }) => {
       return api.patch(`/projects/${projectId}/monthly-reports/${reportId}/transactions/${txId}`, { category });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions", reportId] });
-      queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
-    },
+    onSuccess: invalidateBudgetDependentQueries,
   });
 
   const { data: bankSummary } = useQuery({
@@ -149,10 +154,7 @@ export default function BankStatementStep() {
     mutationFn: async () => {
       return (await api.post(`/projects/${projectId}/monthly-reports/${reportId}/transactions/auto-classify`)).data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions", reportId] });
-      queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
-    },
+    onSuccess: invalidateBudgetDependentQueries,
   });
 
   const bulkApproveMutation = useMutation({
@@ -166,8 +168,7 @@ export default function BankStatementStep() {
     },
     onSuccess: () => {
       setSelectedTxIds(new Set());
-      queryClient.invalidateQueries({ queryKey: ["transactions", reportId] });
-      queryClient.invalidateQueries({ queryKey: ["completeness", reportId] });
+      invalidateBudgetDependentQueries();
     },
   });
 
