@@ -9,7 +9,6 @@ const API_BASE = /^http:\/\/(?!localhost)/.test(rawBase)
 const api = axios.create({
   baseURL: `${API_BASE}/api/v1`,
   timeout: 120_000,
-  headers: { "Content-Type": "application/json" },
 });
 
 // Request interceptor: attach JWT
