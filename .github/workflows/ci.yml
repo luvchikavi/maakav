@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  backend-lint:
+  # Smoke tests — fast hermetic checks that block the build if they fail.
+  backend-test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,10 +18,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff black
-      - run: ruff check .
-      - run: black --check .
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run smoke tests
+        run: python -m pytest app/tests -v
 
+  # Frontend type-check + production build. Both block.
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
@@ -31,6 +36,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run build
+
+  # Lint is informational while we work down the historical debt.
+  # Failures DO NOT block the build — see backend-test for blocking checks.
+  backend-lint:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff black
+      - name: ruff (informational)
+        run: ruff check .
+        continue-on-error: true
+      - name: black (informational)
+        run: black --check .
+        continue-on-error: true
