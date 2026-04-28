@@ -156,16 +156,21 @@ def parse_bulk_upload(file_content: bytes) -> dict:
         ws = wb[tab_name]
         apts = []
         for row in range(2, ws.max_row + 1):
-            # Skip empty rows
+            # A row is valid if any identifying column has data — building may
+            # be empty for single-building projects.
             building = _str(ws.cell(row=row, column=1).value)
-            if not building:
+            wing = _str(ws.cell(row=row, column=2).value)
+            floor = _str(ws.cell(row=row, column=3).value)
+            unit_number = _str(ws.cell(row=row, column=4).value)
+            plan_number = _str(ws.cell(row=row, column=5).value)
+            if not any([building, wing, floor, unit_number, plan_number]):
                 continue
 
             last_col = ws.max_column
             last_val = _str(ws.cell(row=row, column=last_col).value)
 
             apt = {
-                "building_number": building,
+                "building_number": building or "A",
                 "wing": _str(ws.cell(row=row, column=2).value),
                 "floor": _str(ws.cell(row=row, column=3).value),
                 "unit_number": _str(ws.cell(row=row, column=4).value),
@@ -212,7 +217,11 @@ def parse_bulk_upload(file_content: bytes) -> dict:
         apts = []
         for row in range(2, ws.max_row + 1):
             building = _str(ws.cell(row=row, column=1).value)
-            if not building:
+            wing = _str(ws.cell(row=row, column=2).value)
+            floor = _str(ws.cell(row=row, column=3).value)
+            unit_number = _str(ws.cell(row=row, column=4).value)
+            plan_number = _str(ws.cell(row=row, column=5).value)
+            if not any([building, wing, floor, unit_number, plan_number]):
                 continue
 
             raw_type = _str(ws.cell(row=row, column=7).value)
@@ -220,7 +229,7 @@ def parse_bulk_upload(file_content: bytes) -> dict:
             last_val = _str(ws.cell(row=row, column=last_col).value)
 
             apt = {
-                "building_number": building,
+                "building_number": building or "A",
                 "wing": _str(ws.cell(row=row, column=2).value),
                 "floor": _str(ws.cell(row=row, column=3).value),
                 "unit_number": _str(ws.cell(row=row, column=4).value),

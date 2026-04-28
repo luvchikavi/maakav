@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import NumberInput from "@/components/ui/NumberInput";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -357,13 +358,11 @@ function SaleFormModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">מחיר חוזה כולל מע&quot;מ</label>
-              <input
-                type="number"
+              <NumberInput
                 value={priceWithVat}
-                onChange={(e) => handlePriceWithVatChange(e.target.value)}
+                onChange={handlePriceWithVatChange}
                 placeholder="₪"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-left"
-                dir="ltr"
               />
               {selectedApt && selectedApt.list_price_with_vat && priceWithVat && (
                 <p className={`text-xs mt-1 ${Number(priceWithVat) > selectedApt.list_price_with_vat ? "text-green-600" : Number(priceWithVat) < selectedApt.list_price_with_vat ? "text-red-600" : "text-gray-400"}`}>
@@ -377,13 +376,11 @@ function SaleFormModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">מחיר חוזה ללא מע&quot;מ</label>
-              <input
-                type="number"
+              <NumberInput
                 value={priceNoVat}
-                onChange={(e) => setPriceNoVat(e.target.value)}
+                onChange={setPriceNoVat}
                 placeholder="חישוב אוטומטי"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-left"
-                dir="ltr"
               />
             </div>
           </div>
@@ -583,12 +580,10 @@ function PaymentScheduleModal({
                     </td>
                     <td className="py-2.5">
                       <div className="flex items-center gap-1">
-                        <input
-                          type="number"
+                        <NumberInput
                           value={newAmount}
-                          onChange={(e) => setNewAmount(e.target.value)}
+                          onChange={setNewAmount}
                           placeholder={usePercent ? "%" : "₪"}
-                          dir="ltr"
                           className="w-20 px-2 py-1 rounded-lg border border-gray-200 text-sm text-left focus:outline-none focus:ring-1 focus:ring-primary/20"
                         />
                         <button

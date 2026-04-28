@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Save, CheckCircle } from "lucide-react";
 import api from "@/lib/api";
+import NumberInput from "@/components/ui/NumberInput";
 
 export default function ContractorSetupPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -110,7 +111,7 @@ function NumField({ label, value, onChange }: { label: string; value: string; on
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-      <input type="number" value={value} onChange={(e) => onChange(e.target.value)} dir="ltr"
+      <NumberInput value={value} onChange={onChange}
         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
     </div>
   );
