@@ -3,6 +3,7 @@
 import json
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
@@ -14,8 +15,21 @@ from ....models.budget import BudgetCategory, BudgetLineItem, CategoryType
 from ....models.guarantee import GuaranteeSnapshot
 from ....core.dependencies import get_current_user
 from ....services.bulk_upload_service import parse_bulk_upload
+from ....services.bulk_upload_template import build_template_bytes
 
 router = APIRouter(tags=["bulk-upload"])
+
+
+@router.get("/setup/bulk-upload/template")
+async def download_bulk_upload_template(user: User = Depends(get_current_user)):
+    """Download the unified Excel template (8 sheets) for bulk project upload."""
+    content = build_template_bytes()
+    filename = "Maakav_Project_Template.xlsx"
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/projects/{project_id}/setup/bulk-upload/preview")

@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight, Receipt, Building2, Landmark, HardHat, Flag,
   CheckCircle2, Circle, FileSpreadsheet, ChevronLeft, Upload, X,
-  CheckCircle, AlertTriangle, FileUp,
+  CheckCircle, AlertTriangle, FileUp, Download,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
@@ -116,6 +116,25 @@ export default function ProjectPage() {
     queryFn: async () => (await api.get(`/projects/${projectId}/setup/status`)).data,
   });
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await api.get(`/setup/bulk-upload/template`, { responseType: "blob" });
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Maakav_Project_Template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setBulkError("שגיאה בהורדת התבנית");
+    }
+  };
+
   const handleBulkUpload = async (file: File) => {
     setBulkUploading(true);
     setBulkError("");
@@ -194,6 +213,19 @@ export default function ProjectPage() {
       {/* Bulk Upload */}
       {!bulkPreview && (
         <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-gray-500">
+              אין לך עדיין את התבנית? הורד אותה, מלא, ואז העלה כאן.
+            </p>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition"
+            >
+              <Download size={14} />
+              הורד תבנית Excel
+            </button>
+          </div>
           <div
             className="bg-white rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary/60 p-6 text-center cursor-pointer transition"
             onClick={() => {
