@@ -249,11 +249,17 @@ function SaleFormModal({
     }
   };
 
-  // Auto-calc no-VAT from with-VAT
+  // Auto-calc no-VAT from with-VAT, and vice versa
   const handlePriceWithVatChange = (val: string) => {
     setPriceWithVat(val);
     if (val && !isNaN(Number(val))) {
       setPriceNoVat(String(Math.round(Number(val) / 1.18)));
+    }
+  };
+  const handlePriceNoVatChange = (val: string) => {
+    setPriceNoVat(val);
+    if (val && !isNaN(Number(val))) {
+      setPriceWithVat(String(Math.round(Number(val) * 1.18)));
     }
   };
 
@@ -378,7 +384,7 @@ function SaleFormModal({
               <label className="block text-sm font-medium text-gray-700 mb-1">מחיר חוזה ללא מע&quot;מ</label>
               <NumberInput
                 value={priceNoVat}
-                onChange={setPriceNoVat}
+                onChange={handlePriceNoVatChange}
                 placeholder="חישוב אוטומטי"
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-left"
               />

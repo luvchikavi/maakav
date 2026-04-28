@@ -95,6 +95,18 @@ class ApartmentResponse(BaseModel):
 
 # === Financing ===
 
+class GuaranteeFrameworkItem(BaseModel):
+    label: str
+    amount: Decimal | None = None
+    kind: str | None = None  # "sale_law", "land_owner", "free_text"
+
+
+class PreProjectInvestmentItem(BaseModel):
+    label: str
+    amount: Decimal | None = None
+    approved_by: str | None = None
+
+
 class FinancingUpdate(BaseModel):
     financing_type: str | None = None
     financing_body: str | None = None
@@ -103,10 +115,13 @@ class FinancingUpdate(BaseModel):
     credit_limit_construction: Decimal | None = None
     credit_limit_land: Decimal | None = None
     credit_limit_guarantees: Decimal | None = None
+    guarantee_frameworks: list[GuaranteeFrameworkItem] | None = None
     equity_required_amount: Decimal | None = None
     equity_required_percent: Decimal | None = None
+    pre_project_investments: list[PreProjectInvestmentItem] | None = None
     presale_units_required: int | None = None
     presale_amount_required: Decimal | None = None
+    equity_required_after_presale: Decimal | None = None
     interest_rate: Decimal | None = None
     guarantee_fee_percent: Decimal | None = None
     notes: str | None = None

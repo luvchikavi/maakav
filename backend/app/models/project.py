@@ -87,10 +87,17 @@ class ProjectFinancing(Base):
     credit_limit_construction: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     credit_limit_land: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     credit_limit_guarantees: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
+    # List of {label: str, amount: number} dicts. Sum is mirrored to credit_limit_guarantees.
+    guarantee_frameworks: Mapped[list | None] = mapped_column(JSON)
     equity_required_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
+    # List of {label: str, amount: number, approved_by: str} pre-project investments
+    # that count toward the required equity (e.g., contractor-paid land deposits).
+    pre_project_investments: Mapped[list | None] = mapped_column(JSON)
     equity_required_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     presale_units_required: Mapped[int | None] = mapped_column()
     presale_amount_required: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
+    # Optional: equity required AFTER pre-sale conditions are met (often lower).
+    equity_required_after_presale: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     interest_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     guarantee_fee_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     notes: Mapped[str | None] = mapped_column(Text)

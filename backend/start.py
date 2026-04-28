@@ -19,9 +19,21 @@ from app.models import (  # noqa
 
 
 async def init_db():
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist, and apply idempotent column additions."""
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Idempotent column additions — safe to run on every boot.
+        column_additions = [
+            "ALTER TABLE project_financing ADD COLUMN IF NOT EXISTS guarantee_frameworks JSON",
+            "ALTER TABLE project_financing ADD COLUMN IF NOT EXISTS pre_project_investments JSON",
+            "ALTER TABLE project_financing ADD COLUMN IF NOT EXISTS equity_required_after_presale NUMERIC(15, 2)",
+        ]
+        for stmt in column_additions:
+            try:
+                await conn.execute(text(stmt))
+            except Exception as e:
+                print(f"Column-addition skipped ({stmt}): {e}")
     await engine.dispose()
     print("Database tables verified.")
 

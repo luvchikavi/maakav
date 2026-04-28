@@ -30,13 +30,22 @@ async def get_financing(project_id: int, user: User = Depends(get_current_user),
 @router.put("/projects/{project_id}/setup/financing", response_model=FinancingResponse)
 async def save_financing(project_id: int, body: FinancingUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _verify(project_id, user.firm_id, db)
+    payload = body.model_dump(exclude_unset=True, mode="json")
+
+    # Mirror the sum of guarantee_frameworks into credit_limit_guarantees so
+    # downstream calculators that read the single number stay correct.
+    if "guarantee_frameworks" in payload:
+        items = payload.get("guarantee_frameworks") or []
+        total = sum((float(it.get("amount") or 0) for it in items), 0.0)
+        payload["credit_limit_guarantees"] = total
+
     result = await db.execute(select(ProjectFinancing).where(ProjectFinancing.project_id == project_id))
     fin = result.scalar_one_or_none()
     if fin:
-        for field, value in body.model_dump(exclude_unset=True).items():
+        for field, value in payload.items():
             setattr(fin, field, value)
     else:
-        fin = ProjectFinancing(project_id=project_id, **body.model_dump(exclude_unset=True))
+        fin = ProjectFinancing(project_id=project_id, **payload)
         db.add(fin)
     await db.commit()
     await db.refresh(fin)

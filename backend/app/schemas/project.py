@@ -38,6 +38,7 @@ class ProjectUpdate(BaseModel):
     base_index: Decimal | None = None
     base_index_date: date | None = None
     contractor_base_index: Decimal | None = None
+    contractor_base_index_date: date | None = None
     report_0_date: date | None = None
     total_units: int | None = None
     total_buildings: int | None = None
@@ -73,6 +74,7 @@ class ProjectDetailResponse(ProjectResponse):
     base_index: Decimal | None
     base_index_date: date | None
     contractor_base_index: Decimal | None
+    contractor_base_index_date: date | None
     report_0_date: date | None
     total_buildings: int | None
     project_type: str | None
