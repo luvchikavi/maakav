@@ -7,11 +7,11 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight, Receipt, Building2, Landmark, HardHat, Flag,
   CheckCircle2, Circle, FileSpreadsheet, ChevronLeft, Upload, X,
-  CheckCircle, AlertTriangle, FileUp, Download,
+  CheckCircle, AlertTriangle, FileUp, Download, Plus, Clock, Lock, FileText,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { formatCurrencyShort, formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCurrencyShort, formatCurrency, formatNumber, formatMonthYear } from "@/lib/formatters";
 
 interface SetupStatus {
   budget: boolean;
@@ -99,6 +99,23 @@ interface BulkPreview {
   [key: string]: unknown;
 }
 
+interface MonthlyReportListItem {
+  id: number;
+  report_month: string;
+  report_number: number;
+  status: string;
+  generated_at: string | null;
+  created_at: string;
+}
+
+const REPORT_STATUS: Record<string, { label: string; color: string; Icon: typeof Clock }> = {
+  draft: { label: "טיוטה", color: "text-gray-500 bg-gray-50", Icon: Clock },
+  data_entry: { label: "בהזנה", color: "text-blue-600 bg-blue-50", Icon: FileText },
+  review: { label: "בסקירה", color: "text-amber-600 bg-amber-50", Icon: FileText },
+  approved: { label: "מאושר", color: "text-green-600 bg-green-50", Icon: CheckCircle2 },
+  locked: { label: "נעול", color: "text-gray-600 bg-gray-100", Icon: Lock },
+};
+
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const qc = useQueryClient();
@@ -114,6 +131,11 @@ export default function ProjectPage() {
   const { data: status } = useQuery<SetupStatus>({
     queryKey: ["setup-status", projectId],
     queryFn: async () => (await api.get(`/projects/${projectId}/setup/status`)).data,
+  });
+
+  const { data: reports = [] } = useQuery<MonthlyReportListItem[]>({
+    queryKey: ["monthly-reports", projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/monthly-reports`)).data,
   });
 
   const handleDownloadTemplate = async () => {
@@ -393,19 +415,60 @@ export default function ProjectPage() {
 
       {/* Monthly Reports Section */}
       <div className="mt-8">
-        <Link
-          href={`/projects/${projectId}/monthly`}
-          className="block bg-white rounded-2xl border-2 border-primary/20 hover:border-primary/50 p-8 text-center transition group"
-        >
-          <FileSpreadsheet size={48} className="mx-auto text-primary/60 group-hover:text-primary mb-3 transition" />
-          <h3 className="font-bold text-gray-900 mb-1 text-lg">דוחות מעקב חודשיים</h3>
-          <p className="text-gray-500 text-sm">
-            {project.current_report_number > 0
-              ? `${project.current_report_number} דוחות | לחץ לצפייה ויצירת דוח חדש`
-              : "לחץ ליצירת דוח מעקב ראשון"
-            }
-          </p>
-        </Link>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet size={20} className="text-primary" />
+            <h3 className="font-bold text-gray-900 text-lg">דוחות מעקב חודשיים</h3>
+            <span className="text-sm text-gray-400">({reports.length})</span>
+          </div>
+          <Link
+            href={`/projects/${projectId}/monthly`}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark transition"
+          >
+            <Plus size={14} /> דוח חדש
+          </Link>
+        </div>
+
+        {reports.length === 0 ? (
+          <Link
+            href={`/projects/${projectId}/monthly`}
+            className="block bg-white rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary/60 p-8 text-center transition group"
+          >
+            <FileSpreadsheet size={36} className="mx-auto text-primary/40 group-hover:text-primary mb-2 transition" />
+            <p className="text-gray-600 font-medium">לחץ ליצירת דוח מעקב ראשון</p>
+          </Link>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {reports.map((report) => {
+              const cfg = REPORT_STATUS[report.status] || REPORT_STATUS.draft;
+              const StatusIcon = cfg.Icon;
+              return (
+                <Link
+                  key={report.id}
+                  href={`/projects/${projectId}/monthly/${report.id}/bank-statement`}
+                  className="flex items-center justify-between bg-white rounded-xl border border-gray-200 p-4 hover:border-primary/40 hover:shadow-sm transition group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-base font-bold">
+                      {report.report_number}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">דוח מס&apos; {report.report_number}</p>
+                      <p className="text-xs text-gray-500">{formatMonthYear(report.report_month)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${cfg.color}`}>
+                      <StatusIcon size={12} />
+                      {cfg.label}
+                    </span>
+                    <ChevronLeft size={16} className="text-gray-300 group-hover:text-primary transition" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
