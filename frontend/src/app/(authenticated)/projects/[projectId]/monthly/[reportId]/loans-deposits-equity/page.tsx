@@ -184,9 +184,14 @@ export default function LoansDepositsEquityStep() {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-3">
                   <ValueCell label="קרן" value={loan.principal} onChange={(v) => updateLoan(i, { principal: v })} />
-                  <ValueCell label='י.ס. (יתרה נוכחית)' value={loan.current_balance} onChange={(v) => updateLoan(i, { current_balance: v })} bold />
+                  <ValueCell label='י.ס. (יתרת סגירה)' value={loan.current_balance} onChange={(v) => updateLoan(i, { current_balance: v })} bold />
+                  <ComputedCell label="מימון צבור" value={
+                    loan.current_balance != null && loan.principal != null
+                      ? Number(loan.current_balance) - Number(loan.principal)
+                      : null
+                  } />
                   <ValueCell label="חודש קודם" value={loan.prev_month} onChange={(v) => updateLoan(i, { prev_month: v })} muted />
                   <DiffCell label="הפרש" diffValue={d} />
                 </div>
@@ -224,9 +229,14 @@ export default function LoansDepositsEquityStep() {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-5 gap-3">
                   <ValueCell label='סה"כ קרן' value={dep.principal} onChange={(v) => updateDeposit(i, { principal: v })} />
                   <ValueCell label='י.ס. פר"י' value={dep.current_balance} onChange={(v) => updateDeposit(i, { current_balance: v })} bold />
+                  <ComputedCell label="ריבית לקבל" value={
+                    dep.current_balance != null && dep.principal != null
+                      ? Number(dep.current_balance) - Number(dep.principal)
+                      : null
+                  } />
                   <ValueCell label="חודש קודם" value={dep.prev_month} onChange={(v) => updateDeposit(i, { prev_month: v })} muted />
                   <DiffCell label="הפרש" diffValue={d} />
                 </div>
@@ -359,6 +369,17 @@ function ValueCell({ label, value, onChange, bold, muted }: {
         onChange={(v) => onChange(v === "" ? null : Number(v))}
         className={`w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 ${bold ? "font-bold" : ""} ${muted ? "text-gray-500" : ""}`}
       />
+    </div>
+  );
+}
+
+function ComputedCell({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className="text-sm font-medium text-gray-700 py-1.5 bg-gray-50 rounded-lg px-2" dir="ltr">
+        {value == null ? "—" : formatCurrency(value).replace(" ₪", "")}
+      </p>
     </div>
   );
 }
