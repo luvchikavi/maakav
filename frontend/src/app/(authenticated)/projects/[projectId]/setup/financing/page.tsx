@@ -71,6 +71,11 @@ export default function FinancingSetupPage() {
     queryKey: ["project", projectId],
     queryFn: async () => (await api.get(`/projects/${projectId}`)).data,
   });
+  const { data: equitySummary } = useQuery<{ budget_equity_total: number }>({
+    queryKey: ["financing-equity-summary", projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/setup/financing/equity-summary`)).data,
+  });
+  const budgetEquityTotal = Number(equitySummary?.budget_equity_total) || 0;
 
   useEffect(() => {
     if (financing) {
@@ -120,7 +125,10 @@ export default function FinancingSetupPage() {
   }, [project]);
 
   const guaranteeTotal = guarantees.reduce((s, g) => s + (Number(g.amount) || 0), 0);
-  const investmentsTotal = investments.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  const manualInvestmentsTotal = investments.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  // Total recognized equity = manual rows on this screen + auto-computed
+  // sum from per-line budget equity_investment values.
+  const investmentsTotal = manualInvestmentsTotal + budgetEquityTotal;
   const equityRequired = Number(form.equity_required_amount) || 0;
   const equityRemaining = Math.max(0, equityRequired - investmentsTotal);
 
@@ -300,6 +308,16 @@ export default function FinancingSetupPage() {
             <span className="text-xs text-gray-500">מוכרות כחלק מההון העצמי הנדרש</span>
           </div>
           <p className="text-xs text-gray-500 mb-3">סכומים שכבר הושקעו על ידי הקבלן ואושרו על ידי משרד שמאים.</p>
+
+          {budgetEquityTotal > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 mb-3 flex items-center justify-between text-sm">
+              <div>
+                <span className="font-medium text-gray-700">מהשקעות בקובץ התקציב </span>
+                <span className="text-xs text-gray-400">(נקרא אוטומטית מעמודת &quot;השקעות הון עצמי&quot;)</span>
+              </div>
+              <span className="font-bold text-gray-900">{formatCurrency(budgetEquityTotal)}</span>
+            </div>
+          )}
           <div className="space-y-2">
             {investments.length === 0 && (
               <p className="text-xs text-gray-400 text-center py-2">אין השקעות מתועדות</p>

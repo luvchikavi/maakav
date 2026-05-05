@@ -283,9 +283,13 @@ def parse_bulk_upload(file_content: bytes) -> dict:
                 warnings.append(f"קטגוריה לא מוכרת: '{cat_heb}'")
                 cat_key = "indirect_costs"
 
+            # Layout: 1=category 2=description 3=equity_investment 4=cost_no_vat 5=notes.
+            # The original layout used col 3 for supplier_name; that field is no
+            # longer captured via this sheet (can still be set per-line in the
+            # UI). Kept around in the model as nullable for legacy data.
             item = {
                 "description": _str(ws.cell(row=row, column=2).value),
-                "supplier_name": _str(ws.cell(row=row, column=3).value) or None,
+                "equity_investment": _dec(ws.cell(row=row, column=3).value),
                 "cost_no_vat": _dec(ws.cell(row=row, column=4).value),
                 "notes": _str(ws.cell(row=row, column=5).value) or None,
             }

@@ -46,6 +46,10 @@ class BudgetLineItem(Base):
     description: Mapped[str] = mapped_column(String(300))
     source: Mapped[str | None] = mapped_column(String(100))  # ע"פ הסכם / אומדן / שובר
     cost_no_vat: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=0)
+    # Pre-project equity investment recognized for this specific line by an
+    # appraiser. Reduces the line's "remaining" by this amount and rolls up
+    # into the financing-tab pre-project investments total.
+    equity_investment: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     is_index_linked: Mapped[bool] = mapped_column(Boolean, default=True)
     vat_exempt: Mapped[bool] = mapped_column(Boolean, default=False)
     supplier_name: Mapped[str | None] = mapped_column(String(200))

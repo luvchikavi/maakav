@@ -183,6 +183,7 @@ async def confirm_bulk_upload(
                     description=item.get("description", ""),
                     supplier_name=item.get("supplier_name"),
                     cost_no_vat=_to_dec(item.get("cost_no_vat")) or Decimal("0"),
+                    equity_investment=_to_dec(item.get("equity_investment")),
                     notes=item.get("notes"),
                 ))
                 saved["budget_lines"] += 1
