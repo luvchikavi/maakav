@@ -55,6 +55,8 @@ class BankTransactionResponse(BaseModel):
     balance: Decimal | None
     transaction_type: str
     category: str | None
+    category_primary: str | None = None
+    subcategory: str | None = None
     ai_suggested_category: str | None
     ai_confidence: Decimal | None
     is_manually_classified: bool
@@ -64,7 +66,9 @@ class BankTransactionResponse(BaseModel):
 
 
 class TransactionClassifyRequest(BaseModel):
-    category: str
+    category: str | None = None  # legacy flat category — still accepted
+    category_primary: str | None = None  # broad bucket (item A taxonomy)
+    subcategory: str | None = None  # specific item under the primary
     notes: str | None = None
     linked_apartment_id: int | None = None
 

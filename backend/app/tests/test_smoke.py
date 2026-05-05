@@ -188,6 +188,33 @@ def test_fastapi_app_imports_and_has_health_route():
     assert "/health" in routes, f"/health route missing. Routes: {sorted(p for p in routes if p)}"
 
 
+def test_transaction_taxonomy_payload_shape():
+    """Item A: taxonomy endpoint must return a usable shape — primaries
+    list, secondaries dict keyed by primary, and legacy mapping so the
+    frontend can render both dropdowns and recover legacy rows."""
+    from app.services.transaction_taxonomy import taxonomy_payload
+
+    payload = taxonomy_payload()
+    assert any(p["key"] == "withdrawals" for p in payload["primaries"])
+    assert any(p["key"] == "receipts" for p in payload["primaries"])
+    # Secondaries for non-budget primaries should be non-empty
+    assert payload["secondaries"]["withdrawals"]
+    assert payload["secondaries"]["receipts"]
+    # Budget-line primaries have empty secondary lists (filled at runtime)
+    assert payload["secondaries"]["direct_construction"] == []
+    # Legacy mapping covers all current TransactionCategory values
+    from app.models.bank_statement import TransactionCategory
+    for cat in TransactionCategory:
+        assert cat.value in payload["legacy_to_primary"], f"missing legacy mapping for {cat.value}"
+
+
+def test_bank_transaction_response_exposes_two_level_classification():
+    from app.schemas.monthly import BankTransactionResponse
+    fields = BankTransactionResponse.model_fields
+    assert "category_primary" in fields
+    assert "subcategory" in fields
+
+
 def test_loans_deposits_equity_endpoints_registered():
     """Item D: GET/PUT for /loans-deposits-equity must be on the app so the
     new monthly-report step can fetch and persist its snapshot."""
