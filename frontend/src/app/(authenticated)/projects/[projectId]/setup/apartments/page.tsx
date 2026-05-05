@@ -13,6 +13,7 @@ interface Apartment {
   floor: string | null;
   unit_number: string | null;
   unit_type: string;
+  direction: string | null;
   ownership: string;
   unit_status: string;
   room_count: number | null;
@@ -204,6 +205,7 @@ export default function ApartmentsSetupPage() {
                   <th className="text-right px-4 py-3 font-medium">קומה</th>
                   <th className="text-right px-4 py-3 font-medium">מס&apos;ד</th>
                   <th className="text-right px-4 py-3 font-medium">סוג</th>
+                  <th className="text-right px-4 py-3 font-medium">כיוון</th>
                   <th className="text-right px-4 py-3 font-medium">חדרים</th>
                   <th className="text-right px-4 py-3 font-medium">שטח</th>
                   <th className="text-right px-4 py-3 font-medium">בעלות</th>
@@ -219,6 +221,7 @@ export default function ApartmentsSetupPage() {
                     <td className="px-4 py-3 text-gray-900">{apt.floor || "—"}</td>
                     <td className="px-4 py-3 text-gray-900">{apt.unit_number || "—"}</td>
                     <td className="px-4 py-3 text-gray-600">{TYPE_LABELS[apt.unit_type] || apt.unit_type}</td>
+                    <td className="px-4 py-3 text-gray-600">{apt.direction || "—"}</td>
                     <td className="px-4 py-3 text-gray-600">{apt.room_count || "—"}</td>
                     <td className="px-4 py-3 text-gray-600">{apt.net_area_sqm ? `${apt.net_area_sqm} מ"ר` : "—"}</td>
                     <td className="px-4 py-3">

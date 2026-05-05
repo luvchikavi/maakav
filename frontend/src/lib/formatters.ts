@@ -4,7 +4,16 @@
 
 export function formatCurrency(value: number | null | undefined): string {
   if (value == null) return "-";
-  return `${Math.round(value).toLocaleString("he-IL")} ₪`;
+  // Preserve up to 2 decimals when the value has them; otherwise show as
+  // an integer. Bank-statement amounts (e.g. 1,500.45) stay precise while
+  // round budget figures stay clean.
+  const rounded = Math.round(value * 100) / 100;
+  const hasDecimals = rounded % 1 !== 0;
+  const formatted = rounded.toLocaleString("he-IL", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+  return `${formatted} ₪`;
 }
 
 export function formatCurrencyShort(value: number | null | undefined): string {

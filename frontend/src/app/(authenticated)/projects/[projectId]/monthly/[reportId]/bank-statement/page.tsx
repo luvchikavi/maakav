@@ -172,7 +172,10 @@ export default function BankStatementStep() {
     },
   });
 
-  const selectableTxIds = transactions.filter((t) => !t.category && t.ai_suggested_category).map((t) => t.id);
+  // Every row can be selected so the user can group classified + unclassified
+  // rows together. The bulk-approve action only applies an AI suggestion
+  // where one exists; rows without a suggestion are skipped silently.
+  const selectableTxIds = transactions.map((t) => t.id);
   const allSelectableSelected = selectableTxIds.length > 0 && selectableTxIds.every((id) => selectedTxIds.has(id));
   const toggleRowSelection = (txId: number) => {
     setSelectedTxIds((prev) => {
@@ -443,7 +446,7 @@ export default function BankStatementStep() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {transactions.map((tx) => {
-                    const isSelectable = !tx.category && !!tx.ai_suggested_category;
+                    const isSelectable = true;
                     return (
                     <tr key={tx.id} className={`hover:bg-gray-50/50 transition ${!tx.category ? "bg-amber-50/30" : ""}`}>
                       <td className="px-2 py-3 text-center">
