@@ -445,6 +445,14 @@ export default function BankStatementStep() {
             </div>
           </div>
 
+          {/* Second-pass classification panel — group by primary, fill in secondary in batch */}
+          <SecondPassPanel
+            transactions={transactions}
+            taxonomy={taxonomy}
+            budgetLinesByCategory={budgetLinesByCategory}
+            onChangeSecondary={(txId, subcategory) => classifyMutation.mutate({ txId, subcategory })}
+          />
+
           {/* Transaction table */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -625,6 +633,112 @@ export default function BankStatementStep() {
             </button>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ─── Two-pass classification panel ──────────────────────────────────
+//
+// User spec: "First pass — assign primary on every row. Then before
+// moving to the next phase, go through each primary group and assign
+// secondary item by item." This panel renders that grouped view above
+// the row-by-row table, so users can complete the second pass in
+// concentrated batches per primary instead of context-switching.
+
+function SecondPassPanel({
+  transactions, taxonomy, budgetLinesByCategory, onChangeSecondary,
+}: {
+  transactions: Transaction[];
+  taxonomy: Taxonomy | undefined;
+  budgetLinesByCategory: Record<string, { id: number; description: string }[]>;
+  onChangeSecondary: (txId: number, subcategory: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!taxonomy) return null;
+
+  // Group rows that have a primary but are missing a secondary.
+  const groups: Record<string, Transaction[]> = {};
+  for (const tx of transactions) {
+    const primary = tx.category_primary || (tx.category ? taxonomy.legacy_to_primary[tx.category] : null);
+    if (!primary) continue;
+    if (tx.subcategory) continue;
+    (groups[primary] = groups[primary] || []).push(tx);
+  }
+  const groupKeys = Object.keys(groups);
+  const totalNeedSecondary = groupKeys.reduce((s, k) => s + groups[k].length, 0);
+
+  if (totalNeedSecondary === 0) return null;
+
+  const primaryLabel = (key: string) => taxonomy.primaries.find((p) => p.key === key)?.label || key;
+
+  return (
+    <div className="bg-white rounded-2xl border border-amber-200 mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center justify-between px-5 py-3 hover:bg-amber-50/40 transition rounded-t-2xl"
+      >
+        <div className="flex items-center gap-2 text-right">
+          <span className="font-bold text-gray-900">השלמת סיווג משני</span>
+          <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+            {totalNeedSecondary} שורות חסרות סיווג משני · {groupKeys.length} קבוצות
+          </span>
+        </div>
+        <ChevronLeft size={18} className={`text-gray-400 transition ${open ? "rotate-90" : ""}`} />
+      </button>
+      {open && (
+        <div className="border-t border-amber-100 divide-y divide-gray-50">
+          {groupKeys.map((primary) => {
+            const rows = groups[primary];
+            const isBudgetLine = BUDGET_LINE_PRIMARIES.has(primary);
+            const secondaries = isBudgetLine
+              ? (budgetLinesByCategory[primary] || []).map((l) => ({
+                  key: `budget_line_${l.id}`,
+                  label: l.description,
+                }))
+              : (taxonomy.secondaries[primary] || []);
+            return (
+              <div key={primary} className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-sm text-gray-900">
+                    {primaryLabel(primary)}
+                    <span className="text-xs text-gray-400 mr-2">({rows.length})</span>
+                  </h4>
+                </div>
+                {secondaries.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic py-2">אין סעיפי משנה זמינים בקטגוריה זו</p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {rows.map((tx) => (
+                        <tr key={tx.id} className="border-t border-gray-50">
+                          <td className="py-2 text-gray-500 whitespace-nowrap">{formatDate(tx.transaction_date)}</td>
+                          <td className="py-2 text-gray-900 px-2 truncate max-w-xs">{tx.description}</td>
+                          <td className="py-2 text-left text-gray-700 whitespace-nowrap font-medium">
+                            {tx.transaction_type === "credit" ? "+" : "-"}{formatCurrency(Number(tx.amount))}
+                          </td>
+                          <td className="py-2 px-2 w-56">
+                            <select
+                              value={tx.subcategory || ""}
+                              onChange={(e) => onChangeSecondary(tx.id, e.target.value || null)}
+                              className="w-full px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300"
+                            >
+                              <option value="">— בחר סיווג משני —</option>
+                              {secondaries.map((s) => (
+                                <option key={s.key} value={s.key}>{s.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
