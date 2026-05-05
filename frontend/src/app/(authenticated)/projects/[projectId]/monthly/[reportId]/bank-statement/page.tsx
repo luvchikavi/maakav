@@ -67,6 +67,22 @@ export default function BankStatementStep() {
     staleTime: 1000 * 60 * 60, // taxonomy is static, cache for an hour
   });
 
+  // Budget structure — used as the secondary list when primary is one of
+  // the four budget-line categories (tenant_expenses / land_and_taxes /
+  // indirect_costs / direct_construction).
+  type BudgetLine = { id: number; description: string };
+  type BudgetCat = { category_type: string; line_items: BudgetLine[] };
+  const { data: budgetCategories = [] } = useQuery<BudgetCat[]>({
+    queryKey: ["budget", projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/setup/budget`)).data,
+    staleTime: 1000 * 60 * 5,
+  });
+  const budgetLinesByCategory = (() => {
+    const out: Record<string, BudgetLine[]> = {};
+    for (const cat of budgetCategories) out[cat.category_type] = cat.line_items || [];
+    return out;
+  })();
+
   // If there are already transactions in DB, consider it approved
   const hasExistingData = transactions.length > 0;
 
@@ -552,11 +568,30 @@ export default function BankStatementStep() {
                                   ))}
                                 </select>
                               )}
-                              {primaryKey && isBudgetLine && (
-                                <span className="flex-1 px-2 py-1.5 text-xs text-gray-400 italic">
-                                  משני: לפי סעיפי תקציב (בקרוב)
-                                </span>
-                              )}
+                              {primaryKey && isBudgetLine && (() => {
+                                const lines = budgetLinesByCategory[primaryKey] || [];
+                                if (lines.length === 0) {
+                                  return (
+                                    <span className="flex-1 px-2 py-1.5 text-xs text-gray-400 italic">
+                                      אין סעיפי תקציב בקטגוריה זו
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <select
+                                    value={tx.subcategory || ""}
+                                    onChange={(e) => classifyMutation.mutate({ txId: tx.id, subcategory: e.target.value || null })}
+                                    className={`flex-1 px-2 py-1.5 rounded-lg border text-xs ${colorClass} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                                  >
+                                    <option value="">— סעיף תקציב —</option>
+                                    {lines.map((line) => (
+                                      <option key={line.id} value={`budget_line_${line.id}`}>
+                                        {line.description}
+                                      </option>
+                                    ))}
+                                  </select>
+                                );
+                              })()}
                             </div>
                           );
                         })()}
