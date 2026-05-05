@@ -102,6 +102,37 @@ def test_financing_schema_accepts_guarantee_frameworks_and_investments():
     assert dumped["equity_required_after_presale"] == "3000000"
 
 
+def test_monthly_report_create_requires_index_and_vat():
+    """Item C: index and VAT must be captured at report creation, not later."""
+    import pydantic
+    from app.schemas.monthly import MonthlyReportCreate
+
+    # Both required → omitting either raises
+    with pytest.raises(pydantic.ValidationError):
+        MonthlyReportCreate(report_month="2026-04-01")
+    with pytest.raises(pydantic.ValidationError):
+        MonthlyReportCreate(report_month="2026-04-01", current_index="138.4")
+    # With both → ok
+    payload = MonthlyReportCreate(
+        report_month="2026-04-01", current_index="138.4", vat_rate="0.18",
+    )
+    assert str(payload.vat_rate) == "0.18"
+
+
+def test_sales_contract_accepts_vat_rate_snapshot():
+    """Item C: SalesContract takes a vat_rate snapshot so retroactive rate
+    changes don't distort no-VAT side of past sales."""
+    from app.schemas.monthly import SalesContractCreate, SalesContractResponse
+
+    create = SalesContractCreate(
+        apartment_id=1, buyer_name="x", contract_date="2026-04-01",
+        final_price_with_vat="1000", final_price_no_vat="847.46",
+        vat_rate="0.18",
+    )
+    assert str(create.vat_rate) == "0.18"
+    assert "vat_rate" in SalesContractResponse.model_fields
+
+
 def test_apartment_response_exposes_direction():
     """Inventory display needs the direction (כיוון) field — captured at upload
     via bulk_upload_service but missing from the API response until now."""

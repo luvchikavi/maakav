@@ -77,6 +77,13 @@ export default function SalesStep() {
     queryFn: async () => (await api.get(`/projects/${projectId}/sales/summary`)).data,
   });
 
+  // VAT rate from the current monthly report (e.g. 0.18 = 18%).
+  const { data: report } = useQuery<{ vat_rate: number }>({
+    queryKey: ["report", reportId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/monthly-reports/${reportId}`)).data,
+  });
+  const vatRate = Number(report?.vat_rate) || 0.18;
+
   const { data: sales = [] } = useQuery<Sale[]>({
     queryKey: ["sales", projectId],
     queryFn: async () => (await api.get(`/projects/${projectId}/sales`)).data,
@@ -179,6 +186,7 @@ export default function SalesStep() {
         <SaleFormModal
           projectId={projectId}
           unsold={unsold}
+          vatRate={vatRate}
           onClose={() => setShowForm(false)}
           onSuccess={() => {
             setShowForm(false);
@@ -221,13 +229,15 @@ export default function SalesStep() {
 // ── Sale Form Modal ──────────────────────────────────────────
 
 function SaleFormModal({
-  projectId, unsold, onClose, onSuccess,
+  projectId, unsold, onClose, onSuccess, vatRate,
 }: {
   projectId: string;
   unsold: UnsoldApartment[];
   onClose: () => void;
   onSuccess: () => void;
+  vatRate: number;
 }) {
+  const vatMultiplier = 1 + vatRate;
   const [aptId, setAptId] = useState("");
   const [buyerName, setBuyerName] = useState("");
   const [buyerId, setBuyerId] = useState("");
@@ -249,17 +259,18 @@ function SaleFormModal({
     }
   };
 
-  // Auto-calc no-VAT from with-VAT, and vice versa
+  // Auto-calc no-VAT from with-VAT, and vice versa, using the current
+  // monthly report's VAT rate.
   const handlePriceWithVatChange = (val: string) => {
     setPriceWithVat(val);
     if (val && !isNaN(Number(val))) {
-      setPriceNoVat(String(Math.round(Number(val) / 1.18)));
+      setPriceNoVat(String(Math.round(Number(val) / vatMultiplier)));
     }
   };
   const handlePriceNoVatChange = (val: string) => {
     setPriceNoVat(val);
     if (val && !isNaN(Number(val))) {
-      setPriceWithVat(String(Math.round(Number(val) * 1.18)));
+      setPriceWithVat(String(Math.round(Number(val) * vatMultiplier)));
     }
   };
 
@@ -279,6 +290,7 @@ function SaleFormModal({
         original_price_with_vat: selectedApt?.list_price_with_vat || Number(priceWithVat),
         final_price_with_vat: Number(priceWithVat),
         final_price_no_vat: Number(priceNoVat),
+        vat_rate: vatRate,
       });
       onSuccess();
     } catch (err: any) {

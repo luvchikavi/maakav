@@ -31,6 +31,9 @@ class SalesContract(Base):
     original_price_with_vat: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     final_price_with_vat: Mapped[Decimal] = mapped_column(Numeric(15, 2))
     final_price_no_vat: Mapped[Decimal] = mapped_column(Numeric(15, 2))
+    # Snapshot of the VAT rate at sale time. Lets the no-VAT side of past
+    # sales stay correct after a project-level rate change.
+    vat_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     is_recognized_by_bank: Mapped[bool] = mapped_column(default=False)  # תקבולים >15%
     is_non_linear: Mapped[bool] = mapped_column(default=False)  # תקבול אחרון >40%
     notes: Mapped[str | None] = mapped_column(Text)

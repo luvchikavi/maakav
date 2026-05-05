@@ -10,6 +10,7 @@ from ....models.user import User
 from ....models.project import Project
 from ....models.apartment import Apartment, UnitStatus
 from ....models.sales import SalesContract, PaymentScheduleItem, PaymentStatus
+from ....models.monthly_report import MonthlyReport
 from ....schemas.monthly import (
     SalesContractCreate, SalesContractResponse,
     PaymentScheduleItemCreate, PaymentScheduleItemUpdate, PaymentScheduleItemResponse,
@@ -56,7 +57,21 @@ async def create_sale(
     if existing:
         raise HTTPException(status_code=400, detail="דירה זו כבר נמכרה")
 
-    contract = SalesContract(project_id=project_id, **body.model_dump())
+    payload = body.model_dump()
+    # If the caller didn't pass a vat_rate, snapshot it from the project's
+    # most recent monthly report so retroactive rate changes don't distort
+    # past sales.
+    if payload.get("vat_rate") is None:
+        latest_report = (await db.execute(
+            select(MonthlyReport)
+            .where(MonthlyReport.project_id == project_id)
+            .order_by(MonthlyReport.report_number.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if latest_report is not None:
+            payload["vat_rate"] = latest_report.vat_rate
+
+    contract = SalesContract(project_id=project_id, **payload)
     db.add(contract)
 
     # Update apartment status
