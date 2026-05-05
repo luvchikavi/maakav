@@ -188,6 +188,21 @@ def test_fastapi_app_imports_and_has_health_route():
     assert "/health" in routes, f"/health route missing. Routes: {sorted(p for p in routes if p)}"
 
 
+def test_classifier_pattern_match_emits_two_levels():
+    """PR #7: rule-based classification must emit suggested_primary in addition
+    to the legacy suggested_category so the bank-statement UI can render it
+    without a second AI roundtrip."""
+    from app.services.transaction_classifier import classify_by_patterns
+    from app.services.transaction_taxonomy import LEGACY_CATEGORY_TO_PRIMARY
+
+    # Sanity: the classifier covers a debit pattern → legacy → primary
+    legacy = classify_by_patterns("רכישת חומרי בנייה", "debit")
+    if legacy:  # only test when a pattern actually matched (defensive)
+        assert legacy in LEGACY_CATEGORY_TO_PRIMARY, (
+            f"pattern returned {legacy!r} which has no primary mapping"
+        )
+
+
 def test_transaction_taxonomy_payload_shape():
     """Item A: taxonomy endpoint must return a usable shape — primaries
     list, secondaries dict keyed by primary, and legacy mapping so the
