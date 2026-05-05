@@ -166,7 +166,21 @@ async def list_transactions(
         .where(BankTransaction.monthly_report_id == report_id, BankTransaction.project_id == project_id)
         .order_by(BankTransaction.id)  # preserve original bank-statement order
     )
-    return result.scalars().all()
+    txs = result.scalars().all()
+
+    # Backfill category_primary for legacy rows that were classified before
+    # item A landed. One round-trip per uncovered row, run lazily on read.
+    from ....services.transaction_taxonomy import primary_for_category
+    needs_commit = False
+    for t in txs:
+        if t.category_primary is None and t.category is not None:
+            primary = primary_for_category(t.category.value)
+            if primary:
+                t.category_primary = primary
+                needs_commit = True
+    if needs_commit:
+        await db.commit()
+    return txs
 
 
 @router.patch("/projects/{project_id}/monthly-reports/{report_id}/transactions/{tx_id}")
@@ -187,7 +201,12 @@ async def classify_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="התנועה לא נמצאה")
 
-    tx.category = TransactionCategory(body.category)
+    if body.category is not None:
+        tx.category = TransactionCategory(body.category) if body.category else None
+    if body.category_primary is not None:
+        tx.category_primary = body.category_primary or None
+    if body.subcategory is not None:
+        tx.subcategory = body.subcategory or None
     tx.is_manually_classified = True
     if body.notes:
         tx.notes = body.notes
@@ -196,6 +215,14 @@ async def classify_transaction(
 
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/transactions/taxonomy")
+async def transaction_taxonomy(user: User = Depends(get_current_user)):
+    """Item A: primary + secondary classification taxonomy. Used by the
+    bank-statement page to populate the two cascading dropdowns."""
+    from ....services.transaction_taxonomy import taxonomy_payload
+    return taxonomy_payload()
 
 
 @router.post("/projects/{project_id}/monthly-reports/{report_id}/transactions/bulk-classify")

@@ -18,34 +18,29 @@ interface Transaction {
   balance: number | null;
   transaction_type: string;
   category: string | null;
+  category_primary: string | null;
+  subcategory: string | null;
   ai_suggested_category: string | null;
   ai_confidence: number | null;
   is_manually_classified: boolean;
 }
 
-const EXPENSE_CATEGORIES = [
-  { value: "tenant_expenses", label: "הוצאות דיירים" },
-  { value: "land_and_taxes", label: "קרקע ומיסוי" },
-  { value: "indirect_costs", label: "הוצאות עקיפות" },
-  { value: "direct_construction", label: "בניה ישירה" },
-  { value: "deposit_to_savings", label: "הפקדה לפקדון" },
-  { value: "other_expense", label: "הוצאה אחרת" },
-  { value: "loan_repayment", label: "החזר הלוואה" },
-  { value: "interest_and_fees", label: "ריביות ועמלות" },
-];
+interface Taxonomy {
+  primaries: { key: string; label: string }[];
+  secondaries: Record<string, { key: string; label: string }[]>;
+  legacy_to_primary: Record<string, string>;
+}
 
-const INCOME_CATEGORIES = [
-  { value: "sale_income", label: "הכנסה ממכירה" },
-  { value: "tax_refunds", label: "החזרי מיסים" },
-  { value: "vat_refunds", label: 'החזרי מע"מ' },
-  { value: "equity_deposit", label: "הפקדת הון עצמי" },
-  { value: "upgrades_income", label: "הכנסה משידרוגים" },
-  { value: "loan_received", label: "הכנסה מהלוואה" },
-  { value: "other_income", label: "הכנסה אחרת" },
-];
+const BUDGET_LINE_PRIMARIES = new Set([
+  "tenant_expenses", "land_and_taxes", "indirect_costs", "direct_construction",
+]);
+const EXPENSE_PRIMARIES = new Set([
+  "tenant_expenses", "land_and_taxes", "indirect_costs", "direct_construction",
+  "interest_fees_guarantees", "withdrawals",
+]);
 
-const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
-const EXPENSE_VALUES = new Set(EXPENSE_CATEGORIES.map(c => c.value));
+// Old flat category constants were replaced by the primary+secondary
+// taxonomy fetched via /transactions/taxonomy.
 
 export default function BankStatementStep() {
   const { projectId, reportId } = useParams<{ projectId: string; reportId: string }>();
@@ -64,6 +59,12 @@ export default function BankStatementStep() {
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ["transactions", reportId],
     queryFn: async () => (await api.get(`/projects/${projectId}/monthly-reports/${reportId}/transactions`)).data,
+  });
+
+  const { data: taxonomy } = useQuery<Taxonomy>({
+    queryKey: ["transaction-taxonomy"],
+    queryFn: async () => (await api.get(`/transactions/taxonomy`)).data,
+    staleTime: 1000 * 60 * 60, // taxonomy is static, cache for an hour
   });
 
   // If there are already transactions in DB, consider it approved
@@ -128,8 +129,17 @@ export default function BankStatementStep() {
   };
 
   const classifyMutation = useMutation({
-    mutationFn: async ({ txId, category }: { txId: number; category: string }) => {
-      return api.patch(`/projects/${projectId}/monthly-reports/${reportId}/transactions/${txId}`, { category });
+    mutationFn: async ({ txId, category, category_primary, subcategory }: {
+      txId: number;
+      category?: string | null;
+      category_primary?: string | null;
+      subcategory?: string | null;
+    }) => {
+      const body: Record<string, unknown> = {};
+      if (category !== undefined) body.category = category;
+      if (category_primary !== undefined) body.category_primary = category_primary;
+      if (subcategory !== undefined) body.subcategory = subcategory;
+      return api.patch(`/projects/${projectId}/monthly-reports/${reportId}/transactions/${txId}`, body);
     },
     onSuccess: invalidateBudgetDependentQueries,
   });
@@ -478,40 +488,76 @@ export default function BankStatementStep() {
                       </td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const isExpense = tx.category ? EXPENSE_VALUES.has(tx.category) : tx.transaction_type === "debit";
-                          const colorClass = tx.category
+                          const primaryKey = tx.category_primary || (tx.category ? taxonomy?.legacy_to_primary?.[tx.category] : null);
+                          const isExpense = primaryKey ? EXPENSE_PRIMARIES.has(primaryKey) : tx.transaction_type === "debit";
+                          const colorClass = primaryKey
                             ? isExpense
                               ? "border-red-200 bg-red-50 text-red-800"
                               : "border-green-200 bg-green-50 text-green-800"
                             : "border-amber-200 bg-amber-50 text-amber-800";
-                          const primaryCats = tx.transaction_type === "debit" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
-                          const secondaryCats = tx.transaction_type === "debit" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-                          const primaryLabel = tx.transaction_type === "debit" ? "הוצאות" : "הכנסות";
-                          const secondaryLabel = tx.transaction_type === "debit" ? "הכנסות" : "הוצאות";
+                          // Filter primaries by transaction direction.
+                          const expenseGroupKeys = ["tenant_expenses", "land_and_taxes", "indirect_costs", "direct_construction", "interest_fees_guarantees", "withdrawals"];
+                          const incomeGroupKeys = ["receipts", "deposits"];
+                          const allowedPrimaries = (taxonomy?.primaries || []).filter((p) =>
+                            tx.transaction_type === "debit"
+                              ? expenseGroupKeys.includes(p.key)
+                              : incomeGroupKeys.includes(p.key)
+                          );
+                          const otherPrimaries = (taxonomy?.primaries || []).filter((p) =>
+                            !allowedPrimaries.some((a) => a.key === p.key)
+                          );
+                          const secondaries = primaryKey ? (taxonomy?.secondaries?.[primaryKey] || []) : [];
+                          const isBudgetLine = primaryKey ? BUDGET_LINE_PRIMARIES.has(primaryKey) : false;
                           return (
-                            <select
-                              value={tx.category || ""}
-                              onChange={(e) => {
-                                if (e.target.value) classifyMutation.mutate({ txId: tx.id, category: e.target.value });
-                              }}
-                              className={`w-full px-3 py-1.5 rounded-lg border text-xs ${colorClass} focus:outline-none focus:ring-2 focus:ring-primary/20`}
-                            >
-                              <option value="">
-                                {tx.ai_suggested_category && !tx.category
-                                  ? `💡 ${ALL_CATEGORIES.find(c => c.value === tx.ai_suggested_category)?.label || tx.ai_suggested_category}`
-                                  : "— בחר סיווג —"}
-                              </option>
-                              <optgroup label={primaryLabel}>
-                                {primaryCats.map((c) => (
-                                  <option key={c.value} value={c.value}>{c.label}</option>
+                            <div className="flex gap-1.5">
+                              <select
+                                value={primaryKey || ""}
+                                onChange={(e) => {
+                                  const next = e.target.value || null;
+                                  classifyMutation.mutate({
+                                    txId: tx.id,
+                                    category_primary: next,
+                                    subcategory: null,
+                                    // also set the legacy flat category for budget-line primaries
+                                    category: next && BUDGET_LINE_PRIMARIES.has(next) ? next : tx.category,
+                                  });
+                                }}
+                                className={`flex-1 px-2 py-1.5 rounded-lg border text-xs ${colorClass} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                              >
+                                <option value="">
+                                  {tx.ai_suggested_category && !primaryKey
+                                    ? `💡 ${taxonomy?.legacy_to_primary?.[tx.ai_suggested_category] ? taxonomy.primaries.find(p => p.key === taxonomy.legacy_to_primary[tx.ai_suggested_category!])?.label : tx.ai_suggested_category}`
+                                    : "— ראשי —"}
+                                </option>
+                                {allowedPrimaries.map((p) => (
+                                  <option key={p.key} value={p.key}>{p.label}</option>
                                 ))}
-                              </optgroup>
-                              <optgroup label={secondaryLabel}>
-                                {secondaryCats.map((c) => (
-                                  <option key={c.value} value={c.value}>{c.label}</option>
-                                ))}
-                              </optgroup>
-                            </select>
+                                {otherPrimaries.length > 0 && (
+                                  <optgroup label="כיוון נגדי">
+                                    {otherPrimaries.map((p) => (
+                                      <option key={p.key} value={p.key}>{p.label}</option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </select>
+                              {primaryKey && !isBudgetLine && (
+                                <select
+                                  value={tx.subcategory || ""}
+                                  onChange={(e) => classifyMutation.mutate({ txId: tx.id, subcategory: e.target.value || null })}
+                                  className={`flex-1 px-2 py-1.5 rounded-lg border text-xs ${colorClass} focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                                >
+                                  <option value="">— משני —</option>
+                                  {secondaries.map((s) => (
+                                    <option key={s.key} value={s.key}>{s.label}</option>
+                                  ))}
+                                </select>
+                              )}
+                              {primaryKey && isBudgetLine && (
+                                <span className="flex-1 px-2 py-1.5 text-xs text-gray-400 italic">
+                                  משני: לפי סעיפי תקציב (בקרוב)
+                                </span>
+                              )}
+                            </div>
                           );
                         })()}
                       </td>

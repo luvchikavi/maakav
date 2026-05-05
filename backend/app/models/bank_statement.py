@@ -86,6 +86,14 @@ class BankTransaction(Base):
     balance: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     transaction_type: Mapped[TransactionType] = mapped_column(SAEnum(TransactionType))
     category: Mapped[TransactionCategory | None] = mapped_column(SAEnum(TransactionCategory))
+    # Two-level classification (item A in the QA list):
+    # - category_primary: broad bucket (Hebrew label rendered from
+    #   transaction_taxonomy.PRIMARY_LABELS). Stored as the English key.
+    # - subcategory: the specific sub-item within the primary, either a
+    #   key from PRIMARY_SECONDARIES or a budget-line id rendered as a
+    #   string (for the four budget-line primaries).
+    category_primary: Mapped[str | None] = mapped_column(String(60))
+    subcategory: Mapped[str | None] = mapped_column(String(120))
     ai_suggested_category: Mapped[str | None] = mapped_column(String(50))
     ai_confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     is_manually_classified: Mapped[bool] = mapped_column(Boolean, default=False)
