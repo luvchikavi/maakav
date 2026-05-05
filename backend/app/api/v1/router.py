@@ -14,6 +14,7 @@ from .monthly.sales import router as sales_router
 from .monthly.calculations import router as calculations_router
 from .monthly.generation import router as generation_router
 from .monthly.guarantees import router as guarantees_router
+from .monthly.loans_deposits_equity import router as loans_deposits_equity_router
 from .monthly.analytics import router as analytics_router
 from .monthly.check_approvals import router as check_approvals_router
 from .users import router as users_router
@@ -41,6 +42,7 @@ api_router.include_router(sales_router)
 api_router.include_router(calculations_router)
 api_router.include_router(generation_router)
 api_router.include_router(guarantees_router)
+api_router.include_router(loans_deposits_equity_router)
 api_router.include_router(analytics_router)
 api_router.include_router(check_approvals_router)
 
