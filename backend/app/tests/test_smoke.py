@@ -203,6 +203,60 @@ def test_classifier_pattern_match_emits_two_levels():
         )
 
 
+def test_financing_bodies_catalog_groups_and_includes_insurance():
+    """PR #8: the financing-bodies dropdown is fed from a catalog grouped
+    by kind. Banks, non-banks, and insurance must each be present."""
+    from app.services.financing_bodies import grouped_payload
+
+    payload = grouped_payload()
+    kinds = {g["kind"] for g in payload["groups"]}
+    assert kinds == {"bank", "non_bank", "insurance"}
+    by_label = {b["label"] for g in payload["groups"] for b in g["bodies"]}
+    # Spot-check from the user's screenshot
+    for required in ("לאומי", "הפועלים", "טוב קפיטל", "שלמה", "כלל"):
+        assert required in by_label, f"missing financing body: {required}"
+
+
+def test_classifier_routes_insurance_payments_to_indirect_costs():
+    """Insurance companies in the description must NOT classify as ריבית.
+    The user's screenshot showed 'ש.שלמה חברה לביטוח' wrongly mapped to
+    interest; in reality it's a builder's-risk insurance payment under
+    indirect_costs. Same for Phoenix/Migdal/Harel/Menorah/Ayalon/Clal."""
+    from app.services.transaction_classifier import classify_by_patterns_rich
+
+    cases = [
+        "תשלום ש.שלמה חברה לביטוח 12345",
+        "העברה הפניקס חברה לביטוח",
+        "כלל ביטוח חודש 04/26",
+        "מנורה מבטחים פוליסה",
+        "מגדל חברה לביטוח",
+    ]
+    for desc in cases:
+        rich = classify_by_patterns_rich(desc, "debit")
+        assert rich is not None, f"no match for: {desc}"
+        assert rich.get("primary") == "indirect_costs", (
+            f"{desc!r} → primary={rich.get('primary')!r}, expected indirect_costs"
+        )
+
+
+def test_classifier_handles_hapoalim_split_loan_lines():
+    """Hapoalim posts the same loan event as two separate rows:
+    'פירעון קרן' (principal, withdrawals) and 'ריבית הלוואה' (interest,
+    interest_fees_guarantees). Both must classify correctly on their own."""
+    from app.services.transaction_classifier import classify_by_patterns_rich
+
+    principal = classify_by_patterns_rich("פירעון קרן הלוואה 100012", "debit")
+    interest = classify_by_patterns_rich("ריבית הלוואה 100012", "debit")
+    assert principal == {
+        "legacy": "loan_repayment", "primary": "withdrawals",
+        "secondary": "loan_repayment_senior",
+    }
+    assert interest == {
+        "legacy": "interest_and_fees", "primary": "interest_fees_guarantees",
+        "secondary": "interest_and_fees",
+    }
+
+
 def test_extended_patterns_cover_real_world_descriptions():
     """PR #7 follow-up: real bank-statement descriptions provided by the user
     in May 2026 (זיכוי שובר, פתיחת הלוואה, פירעון פק"מ, ריבית עו"ש,

@@ -50,7 +50,8 @@ export default function FinancingSetupPage() {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState({
-    financing_type: "", credit_limit_total: "", credit_limit_construction: "",
+    financing_type: "", financing_body: "",
+    credit_limit_total: "", credit_limit_construction: "",
     credit_limit_land: "", credit_limit_guarantees: "", equity_required_amount: "",
     equity_required_percent: "", presale_units_required: "", presale_amount_required: "",
     equity_required_after_presale: "",
@@ -77,10 +78,22 @@ export default function FinancingSetupPage() {
   });
   const budgetEquityTotal = Number(equitySummary?.budget_equity_total) || 0;
 
+  type FinancingBodyGroup = {
+    kind: string;
+    label: string;
+    bodies: { key: string; label: string; kind: string }[];
+  };
+  const { data: bodiesPayload } = useQuery<{ groups: FinancingBodyGroup[] }>({
+    queryKey: ["financing-bodies"],
+    queryFn: async () => (await api.get(`/setup/financing-bodies`)).data,
+    staleTime: 1000 * 60 * 60,
+  });
+
   useEffect(() => {
     if (financing) {
       setForm({
         financing_type: financing.financing_type || "",
+        financing_body: financing.financing_body || "",
         credit_limit_total: financing.credit_limit_total?.toString() || "",
         credit_limit_construction: financing.credit_limit_construction?.toString() || "",
         credit_limit_land: financing.credit_limit_land?.toString() || "",
@@ -207,14 +220,30 @@ export default function FinancingSetupPage() {
       <p className="text-gray-500 mb-6">הסכם ליווי, מסגרות אשראי, מדדים והון עצמי נדרש</p>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-8 space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">סוג מימון</label>
-          <select value={form.financing_type} onChange={(e) => set("financing_type", e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
-            <option value="">בחר...</option>
-            <option value="banking">בנקאי</option>
-            <option value="non_banking">חוץ בנקאי</option>
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">סוג מימון</label>
+            <select value={form.financing_type} onChange={(e) => set("financing_type", e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+              <option value="">בחר...</option>
+              <option value="banking">בנקאי</option>
+              <option value="non_banking">חוץ בנקאי</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">גוף מימון</label>
+            <select value={form.financing_body} onChange={(e) => set("financing_body", e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+              <option value="">בחר...</option>
+              {(bodiesPayload?.groups || []).map((g) => (
+                <optgroup key={g.kind} label={g.label}>
+                  {g.bodies.map((b) => (
+                    <option key={b.key} value={b.key}>{b.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
         </div>
 
         <h3 className="font-bold text-gray-900 pt-2">מסגרות אשראי</h3>
