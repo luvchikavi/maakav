@@ -321,6 +321,19 @@ def test_bank_transaction_response_exposes_two_level_classification():
     assert "subcategory" in fields
 
 
+def test_loans_deposits_equity_endpoint_returns_presale_status():
+    """PR #14: presale_status must be in the response so the UI can show
+    whether the auto-flip rule fired (units met + amount met → switches
+    to equity_required_after_presale)."""
+    import inspect
+    from app.api.v1.monthly import loans_deposits_equity as mod
+
+    src = inspect.getsource(mod.get_loans_deposits_equity)
+    # The endpoint code constructs presale_status with these keys
+    for key in ("units_required", "amount_required", "units_count", "total_amount", "met"):
+        assert key in src, f"presale_status missing key {key!r} in endpoint"
+
+
 def test_loans_deposits_equity_aggregates_equity_subcategories():
     """PR #13: equity composition rows must sum BankTransaction rows by
     subcategory (equity_deposit / equity_withdrawal). Smoke-checks that

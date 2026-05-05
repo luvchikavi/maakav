@@ -32,6 +32,14 @@ type EquityComponent = {
   source: string;
 };
 
+type PresaleStatus = {
+  units_required: number;
+  amount_required: number;
+  units_count: number;
+  total_amount: number;
+  met: boolean;
+};
+
 type Payload = {
   as_of: string | null;
   loans: LoanItem[];
@@ -42,6 +50,7 @@ type Payload = {
     required_amount: number;
     gap: number;
   };
+  presale_status?: PresaleStatus;
   notes: string | null;
 };
 
@@ -294,6 +303,16 @@ export default function LoansDepositsEquityStep() {
         </table>
 
         <p className="text-sm text-gray-500 mb-3 font-bold">בדיקת עמידה בדרישת הליווי</p>
+        {data.presale_status && data.presale_status.units_required > 0 && (
+          <div className={`text-xs rounded-lg p-2.5 mb-3 ${data.presale_status.met ? "bg-green-50 text-green-800 border border-green-200" : "bg-blue-50 text-blue-900 border border-blue-100"}`}>
+            <span className="font-bold">תנאי מכר מוקדם: </span>
+            נמכרו <span className="font-bold">{data.presale_status.units_count}</span>/{data.presale_status.units_required} יחידות,{" "}
+            סך מכירות <span className="font-bold">{formatCurrency(data.presale_status.total_amount)}</span>/{formatCurrency(data.presale_status.amount_required)}.
+            {data.presale_status.met
+              ? " ✓ התנאי הושלם — הון העצמי הנדרש הופחת בהתאם להסכם."
+              : " — בעת השלמת התנאי, ההון העצמי הנדרש יעבור לערך המופחת."}
+          </div>
+        )}
         <table className="w-full">
           <tbody>
             <tr className="border-b border-gray-50">
