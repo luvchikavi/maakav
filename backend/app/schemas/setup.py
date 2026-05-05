@@ -78,6 +78,7 @@ class ApartmentResponse(BaseModel):
     floor: str | None
     unit_number: str | None
     unit_type: str
+    direction: str | None = None
     ownership: str
     unit_status: str
     room_count: Decimal | None

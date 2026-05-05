@@ -164,7 +164,7 @@ async def list_transactions(
     result = await db.execute(
         select(BankTransaction)
         .where(BankTransaction.monthly_report_id == report_id, BankTransaction.project_id == project_id)
-        .order_by(BankTransaction.transaction_date)
+        .order_by(BankTransaction.id)  # preserve original bank-statement order
     )
     return result.scalars().all()
 
@@ -271,7 +271,7 @@ async def get_bank_summary(
             select(BankTransaction).where(
                 BankTransaction.monthly_report_id == report_id,
                 BankTransaction.project_id == project_id,
-            ).order_by(BankTransaction.transaction_date)
+            ).order_by(BankTransaction.id)  # preserve original bank-statement order
         )).scalars().all()
 
         if not txs:

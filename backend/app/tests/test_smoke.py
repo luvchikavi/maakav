@@ -102,6 +102,15 @@ def test_financing_schema_accepts_guarantee_frameworks_and_investments():
     assert dumped["equity_required_after_presale"] == "3000000"
 
 
+def test_apartment_response_exposes_direction():
+    """Inventory display needs the direction (כיוון) field — captured at upload
+    via bulk_upload_service but missing from the API response until now."""
+    from app.schemas.setup import ApartmentResponse
+
+    fields = ApartmentResponse.model_fields
+    assert "direction" in fields, "ApartmentResponse must expose 'direction'"
+
+
 def test_project_update_schema_accepts_contractor_base_index_date():
     """ProjectUpdate must accept the new contractor_base_index_date so the
     financing page can persist the contractor agreement base index date."""
