@@ -9,8 +9,8 @@ from pydantic import BaseModel
 
 class MonthlyReportCreate(BaseModel):
     report_month: date  # First day of month
-    current_index: Decimal | None = None
-    vat_rate: Decimal = Decimal("0.18")
+    current_index: Decimal  # required — captured at report open
+    vat_rate: Decimal       # required — captured at report open (e.g. 0.18 for 18%)
 
 
 class MonthlyReportResponse(BaseModel):
@@ -98,6 +98,7 @@ class SalesContractCreate(BaseModel):
     original_price_with_vat: Decimal | None = None
     final_price_with_vat: Decimal
     final_price_no_vat: Decimal
+    vat_rate: Decimal | None = None  # snapshot of project VAT rate at sale time
     notes: str | None = None
 
 
@@ -110,6 +111,7 @@ class SalesContractResponse(BaseModel):
     original_price_with_vat: Decimal | None
     final_price_with_vat: Decimal
     final_price_no_vat: Decimal
+    vat_rate: Decimal | None = None
     is_recognized_by_bank: bool
     is_non_linear: bool
     notes: str | None

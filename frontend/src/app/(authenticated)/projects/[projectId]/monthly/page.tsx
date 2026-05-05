@@ -33,6 +33,9 @@ export default function MonthlyReportsPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   });
+  const [currentIndex, setCurrentIndex] = useState("");
+  const [vatPercent, setVatPercent] = useState("18");
+  const [createError, setCreateError] = useState("");
 
   const { data: reports = [], isLoading } = useQuery<MonthlyReport[]>({
     queryKey: ["monthly-reports", projectId],
@@ -41,11 +44,24 @@ export default function MonthlyReportsPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      return api.post(`/projects/${projectId}/monthly-reports`, { report_month: month });
+      const idx = Number(currentIndex);
+      const vat = Number(vatPercent);
+      if (!idx || idx <= 0) throw new Error("יש להזין מדד תשומות בנייה לחודש זה");
+      if (!vat || vat <= 0 || vat > 100) throw new Error("יש להזין שיעור מע״מ תקין (לדוגמה: 18)");
+      return api.post(`/projects/${projectId}/monthly-reports`, {
+        report_month: month,
+        current_index: idx,
+        vat_rate: vat / 100,
+      });
     },
     onSuccess: (res) => {
+      setCreateError("");
       queryClient.invalidateQueries({ queryKey: ["monthly-reports", projectId] });
       router.push(`/projects/${projectId}/monthly/${res.data.id}/bank-statement`);
+    },
+    onError: (err: unknown) => {
+      const e = err as { message?: string; response?: { data?: { detail?: string } } };
+      setCreateError(e.message || e.response?.data?.detail || "שגיאה ביצירת הדוח");
     },
   });
 
@@ -72,8 +88,9 @@ export default function MonthlyReportsPage() {
       {showCreate && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
           <h3 className="font-bold text-gray-900 mb-4">יצירת דוח חודשי חדש</h3>
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
+          <p className="text-sm text-gray-500 mb-4">לפני שניתן להתקדם, יש לעדכן את מדד תשומות הבנייה ושיעור המע״מ לחודש זה.</p>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">חודש הדוח</label>
               <input
                 type="month"
@@ -83,6 +100,32 @@ export default function MonthlyReportsPage() {
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">מדד תשומות בנייה</label>
+              <input
+                type="number"
+                step="0.01"
+                value={currentIndex}
+                onChange={(e) => setCurrentIndex(e.target.value)}
+                placeholder="לדוגמה: 138.4"
+                dir="ltr"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">שיעור מע״מ (%)</label>
+              <input
+                type="number"
+                step="0.5"
+                value={vatPercent}
+                onChange={(e) => setVatPercent(e.target.value)}
+                placeholder="18"
+                dir="ltr"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending}
@@ -90,14 +133,12 @@ export default function MonthlyReportsPage() {
             >
               {createMutation.isPending ? "יוצר..." : "צור דוח"}
             </button>
-            <button onClick={() => setShowCreate(false)} className="px-4 py-3 text-gray-500 hover:text-gray-700 transition">
+            <button onClick={() => { setShowCreate(false); setCreateError(""); }} className="px-4 py-3 text-gray-500 hover:text-gray-700 transition">
               ביטול
             </button>
           </div>
-          {createMutation.isError && (
-            <p className="text-red-600 text-sm mt-2">
-              {(createMutation.error as any)?.response?.data?.detail || "שגיאה ביצירת הדוח"}
-            </p>
+          {createError && (
+            <p className="text-red-600 text-sm mt-3">{createError}</p>
           )}
         </div>
       )}
