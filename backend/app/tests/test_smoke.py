@@ -203,6 +203,43 @@ def test_classifier_pattern_match_emits_two_levels():
         )
 
 
+def test_extended_patterns_cover_real_world_descriptions():
+    """PR #7 follow-up: real bank-statement descriptions provided by the user
+    in May 2026 (זיכוי שובר, פתיחת הלוואה, פירעון פק"מ, ריבית עו"ש,
+    עמלת ערבות, הוראת הפקדה בפק"מ, פירעון הלוואה) must classify into the
+    correct primary+secondary on the first pattern pass — no AI required."""
+    from app.services.transaction_classifier import classify_by_patterns_rich
+
+    cases = [
+        # (description, tx_type, expected_primary, expected_secondary)
+        ("זיכוי בגין שוברי תשלום 1234", "credit", "receipts", "buyer_receipt"),
+        ("זיכוי שובר", "credit", "receipts", "buyer_receipt"),
+        ("פתיחת הלוואה 99/8401", "credit", "deposits", "loan_disbursement_senior"),
+        ("העמדת הלוואה (בכיר)", "credit", "deposits", "loan_disbursement_senior"),
+        ('פירעון פק"מ', "credit", "deposits", "deposit_withdrawal"),
+        ('ריבית עו"ש', "debit", "interest_fees_guarantees", "interest_and_fees"),
+        ("ריבית חובה חודשית", "debit", "interest_fees_guarantees", "interest_and_fees"),
+        ("עמלת הארכת ערבות", "debit", "interest_fees_guarantees", "guarantees"),
+        ("עמלת ערבות חדשה", "debit", "interest_fees_guarantees", "guarantees"),
+        ("עמלת פעולה בערוץ", "debit", "interest_fees_guarantees", "fees"),
+        ("דמי ניהול קבועים", "debit", "interest_fees_guarantees", "fees"),
+        ('הוראת הפקדה בפק"מ', "debit", "withdrawals", "deposit_to_savings"),
+        ("פירעון הלוואה (נחות)", "debit", "withdrawals", "loan_repayment_senior"),
+    ]
+    failures = []
+    for desc, tx_type, want_primary, want_secondary in cases:
+        rich = classify_by_patterns_rich(desc, tx_type)
+        if not rich:
+            failures.append(f"  {desc!r} → no match")
+            continue
+        if rich.get("primary") != want_primary or rich.get("secondary") != want_secondary:
+            failures.append(
+                f"  {desc!r} → got ({rich.get('primary')!r}, {rich.get('secondary')!r}), "
+                f"expected ({want_primary!r}, {want_secondary!r})"
+            )
+    assert not failures, "Pattern matches mismatch:\n" + "\n".join(failures)
+
+
 def test_transaction_taxonomy_payload_shape():
     """Item A: taxonomy endpoint must return a usable shape — primaries
     list, secondaries dict keyed by primary, and legacy mapping so the

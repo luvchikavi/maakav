@@ -83,23 +83,115 @@ CATEGORY_TAXONOMY = {
 }
 
 
+# Hebrew bank-statement description patterns sourced from real-world data
+# (Maakav user's classification screenshots, May 2026). Each entry maps a
+# pattern to (legacy_or_None, primary, secondary). Checked BEFORE the
+# coarser legacy CATEGORY_TAXONOMY because these encode both levels at once
+# and cover taxonomy items that have no flat legacy equivalent (e.g.
+# פירעון פק"מ → deposits / deposit_withdrawal).
+EXTENDED_PATTERNS: dict[str, list[tuple[str, str | None, str, str | None]]] = {
+    # tx_type → list of (pattern, legacy_category_or_None, primary, secondary)
+    "credit": [
+        # Buyer payments → receipts
+        ("שוברי תשלום", "sale_income", "receipts", "buyer_receipt"),
+        ("זיכוי שובר", "sale_income", "receipts", "buyer_receipt"),
+        ("זיכוי בגין", "sale_income", "receipts", "buyer_receipt"),
+        ("תקבול מרוכש", "sale_income", "receipts", "buyer_receipt"),
+        # Loan disbursements → deposits
+        ("פתיחת הלוואה", "loan_received", "deposits", "loan_disbursement_senior"),
+        ("העמדת הלוואה", "loan_received", "deposits", "loan_disbursement_senior"),
+        # Deposit withdrawal (פק"מ) → deposits / deposit_withdrawal
+        # Legacy is None because the flat enum has no good fit; we just store
+        # the two-level fields. Endpoint code tolerates None legacy.
+        ("פירעון פק", None, "deposits", "deposit_withdrawal"),
+        ("פירעון פקדון", None, "deposits", "deposit_withdrawal"),
+        ("פירעון פיקדון", None, "deposits", "deposit_withdrawal"),
+        # VAT refunds → deposits / vat_refund
+        ('החזר מע"מ', "vat_refunds", "deposits", "vat_refund"),
+        ("החזר מעמ", "vat_refunds", "deposits", "vat_refund"),
+        # Equity deposits → deposits / equity_deposit
+        ("הפקדת הון עצמי", "equity_deposit", "deposits", "equity_deposit"),
+        ("הפקדת בעלים", "equity_deposit", "deposits", "equity_deposit"),
+    ],
+    "debit": [
+        # Interest charges → interest_fees_guarantees / interest_and_fees
+        ('ריבית עו"ש', "interest_and_fees", "interest_fees_guarantees", "interest_and_fees"),
+        ("ריבית חובה", "interest_and_fees", "interest_fees_guarantees", "interest_and_fees"),
+        ("ריבית ", "interest_and_fees", "interest_fees_guarantees", "interest_and_fees"),
+        # Guarantee-related fees → interest_fees_guarantees / guarantees
+        ("עמלת הארכת ערבות", "interest_and_fees", "interest_fees_guarantees", "guarantees"),
+        ("עמלת ערבות חדשה", "interest_and_fees", "interest_fees_guarantees", "guarantees"),
+        ("עמלת ערבות", "interest_and_fees", "interest_fees_guarantees", "guarantees"),
+        # Generic fees → interest_fees_guarantees / fees
+        ("עמלת פעולה", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("עמלת מנהובים", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("עמלה ", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("דמי ניהול חשבון", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("דמי ניהול קבועים", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("דמי מינוי לפעולות", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("דמי קבועים", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("דמי שינוי", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("דמי השלמ", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("השלמת דמי ניהול", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        ("rtgs", "interest_and_fees", "interest_fees_guarantees", "fees"),
+        # Deposit-to-savings → withdrawals / deposit_to_savings
+        ('הוראת הפקדה בפק"מ', "deposit_to_savings", "withdrawals", "deposit_to_savings"),
+        ("הוראת הפקדה", "deposit_to_savings", "withdrawals", "deposit_to_savings"),
+        ("הפקדה לפקדון", "deposit_to_savings", "withdrawals", "deposit_to_savings"),
+        ("הפקדה לפיקדון", "deposit_to_savings", "withdrawals", "deposit_to_savings"),
+        # Loan repayment → withdrawals / loan_repayment_*
+        ("פירעון הלוואה", "loan_repayment", "withdrawals", "loan_repayment_senior"),
+        ("החזר הלוואה", "loan_repayment", "withdrawals", "loan_repayment_senior"),
+        ("פרעון הלוואה", "loan_repayment", "withdrawals", "loan_repayment_senior"),
+        # VAT payment → withdrawals / vat_payment
+        ('תשלום מע"מ', None, "withdrawals", "vat_payment"),
+        ("תשלום מעמ", None, "withdrawals", "vat_payment"),
+    ],
+}
+
+
 def classify_by_patterns(description: str, tx_type: str) -> Optional[str]:
-    """Fast rule-based classification using keyword matching."""
+    """Fast rule-based classification (legacy flat label only).
+
+    Kept for backwards compatibility with callers that still want a single
+    label. Prefer :func:`classify_by_patterns_rich` for new code — it
+    returns both levels of the new taxonomy.
+    """
+    rich = classify_by_patterns_rich(description, tx_type)
+    return rich.get("legacy") if rich else None
+
+
+def classify_by_patterns_rich(description: str, tx_type: str) -> Optional[dict]:
+    """Returns ``{legacy, primary, secondary}`` for the longest matching pattern,
+    consulting ``EXTENDED_PATTERNS`` first (richer mapping) and falling back
+    to ``CATEGORY_TAXONOMY`` (coarse, legacy-only).
+    """
     desc_lower = description.lower().strip()
-    categories = CATEGORY_TAXONOMY.get(tx_type, {})
 
-    best_match = None
+    # Phase 1: extended patterns — both levels in one shot.
     best_score = 0
+    best: Optional[dict] = None
+    for pattern, legacy, primary, secondary in EXTENDED_PATTERNS.get(tx_type, []):
+        if pattern.lower() in desc_lower:
+            score = len(pattern)
+            if score > best_score:
+                best_score = score
+                best = {"legacy": legacy, "primary": primary, "secondary": secondary}
 
+    if best:
+        return best
+
+    # Phase 2: legacy taxonomy fallback. Only legacy is returned; primary
+    # is derived later via LEGACY_CATEGORY_TO_PRIMARY in the caller.
+    categories = CATEGORY_TAXONOMY.get(tx_type, {})
     for cat_key, cat_info in categories.items():
         for pattern in cat_info["patterns"]:
-            if pattern in desc_lower:
+            if pattern.lower() in desc_lower:
                 score = len(pattern)
                 if score > best_score:
                     best_score = score
-                    best_match = cat_key
-
-    return best_match
+                    best = {"legacy": cat_key, "primary": None, "secondary": None}
+    return best
 
 
 class TransactionClassifierService:
@@ -141,18 +233,20 @@ class TransactionClassifierService:
 
         results = []
 
-        # Phase 1: Rule-based classification — emits both legacy + two-level.
+        # Phase 1: Rule-based classification. Extended patterns return
+        # primary+secondary in one shot; legacy fallback returns just the
+        # flat key, with primary derived via LEGACY_CATEGORY_TO_PRIMARY.
         unclassified = []
         for tx in transactions:
-            pattern_match = classify_by_patterns(tx["description"], tx["type"])
-            if pattern_match:
-                primary = LEGACY_CATEGORY_TO_PRIMARY.get(pattern_match)
+            rich = classify_by_patterns_rich(tx["description"], tx["type"])
+            if rich:
+                primary = rich.get("primary") or LEGACY_CATEGORY_TO_PRIMARY.get(rich.get("legacy") or "")
                 results.append({
                     "id": tx["id"],
-                    "suggested_category": pattern_match,
+                    "suggested_category": rich.get("legacy"),
                     "suggested_primary": primary,
-                    "suggested_secondary": None,  # rule-based has no secondary
-                    "confidence": 0.75,
+                    "suggested_secondary": rich.get("secondary"),
+                    "confidence": 0.85 if rich.get("primary") else 0.75,
                 })
             else:
                 unclassified.append(tx)
