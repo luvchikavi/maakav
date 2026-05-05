@@ -47,6 +47,24 @@ def test_bulk_upload_template_round_trip_is_warning_free():
     assert summary["has_financing"] is True
 
 
+def test_budget_sheet_captures_equity_investment_per_line():
+    """Item B: column 3 of the budget sheet is now equity_investment, parsed
+    per line and surfaced via the bulk-upload preview so it can be persisted
+    onto BudgetLineItem.equity_investment."""
+    from app.services.bulk_upload_service import parse_bulk_upload
+    from app.services.bulk_upload_template import build_template_bytes
+
+    result = parse_bulk_upload(build_template_bytes())
+    items = result["budget_categories"]
+    # The template seeds two rows under הוצאות עקיפות / קרקע ומיסוי with non-zero
+    # equity, plus one zero row to confirm the field is optional.
+    assert any(
+        it.get("equity_investment") and float(it["equity_investment"]) > 0
+        for cat_items in items.values()
+        for it in cat_items
+    ), "Expected at least one budget line with non-zero equity_investment"
+
+
 def test_bulk_upload_keeps_inventory_row_when_building_is_empty():
     """The parser-fix from this batch: rows where building is empty but
     other identifying columns have data must be kept."""

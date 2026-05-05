@@ -2,11 +2,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 
 from ....database import get_db
 from ....models.user import User
 from ....models.project import Project, ProjectFinancing, ContractorAgreement, Milestone
+from ....models.budget import BudgetCategory, BudgetLineItem
 from ....schemas.setup import (
     FinancingUpdate, FinancingResponse,
     ContractorUpdate, ContractorResponse,
@@ -25,6 +26,26 @@ async def get_financing(project_id: int, user: User = Depends(get_current_user),
     await _verify(project_id, user.firm_id, db)
     result = await db.execute(select(ProjectFinancing).where(ProjectFinancing.project_id == project_id))
     return result.scalar_one_or_none()
+
+
+@router.get("/projects/{project_id}/setup/financing/equity-summary")
+async def get_equity_summary(
+    project_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    """Pre-project equity total derived from per-line equity_investment values
+    on the budget. Read-only — sourced from the budget upload, not editable
+    in the financing tab. Returned alongside the manual investments rows so
+    the UI can display both the auto-computed total and itemized free-text
+    rows side by side.
+    """
+    await _verify(project_id, user.firm_id, db)
+    total = (await db.execute(
+        select(func.coalesce(func.sum(BudgetLineItem.equity_investment), 0))
+        .select_from(BudgetLineItem)
+        .join(BudgetCategory, BudgetLineItem.category_id == BudgetCategory.id)
+        .where(BudgetCategory.project_id == project_id)
+    )).scalar() or 0
+    return {"budget_equity_total": float(total)}
 
 
 @router.put("/projects/{project_id}/setup/financing", response_model=FinancingResponse)
