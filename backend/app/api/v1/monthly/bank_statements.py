@@ -128,15 +128,26 @@ async def upload_bank_statement(
             ]
             suggestions = transaction_classifier.classify_transactions(tx_batch)
             for s in suggestions:
-                if s.get("suggested_category") and s.get("confidence", 0) >= 0.5:
-                    tx_obj = next((t for t in all_txs if t.id == s["id"]), None)
-                    if tx_obj:
-                        tx_obj.ai_suggested_category = s["suggested_category"]
-                        tx_obj.ai_confidence = Decimal(str(round(s["confidence"], 2)))
-                        # Auto-apply high-confidence suggestions
-                        if s["confidence"] >= 0.75:
+                confidence = float(s.get("confidence") or 0)
+                if confidence < 0.5:
+                    continue
+                tx_obj = next((t for t in all_txs if t.id == s["id"]), None)
+                if not tx_obj:
+                    continue
+                if s.get("suggested_category"):
+                    tx_obj.ai_suggested_category = s["suggested_category"]
+                tx_obj.ai_confidence = Decimal(str(round(confidence, 2)))
+                if confidence >= 0.75:
+                    if s.get("suggested_category"):
+                        try:
                             tx_obj.category = TransactionCategory(s["suggested_category"])
-                            auto_classified += 1
+                        except ValueError:
+                            pass
+                    if s.get("suggested_primary"):
+                        tx_obj.category_primary = s["suggested_primary"]
+                    if s.get("suggested_secondary"):
+                        tx_obj.subcategory = s["suggested_secondary"]
+                    auto_classified += 1
 
             await db.commit()
     except Exception as e:
@@ -378,14 +389,27 @@ async def auto_classify_transactions(
 
     classified = 0
     for s in suggestions:
-        if s.get("suggested_category") and s.get("confidence", 0) >= 0.5:
-            tx_obj = next((t for t in unclassified if t.id == s["id"]), None)
-            if tx_obj:
-                tx_obj.ai_suggested_category = s["suggested_category"]
-                tx_obj.ai_confidence = Decimal(str(round(s["confidence"], 2)))
-                if s["confidence"] >= 0.75:
+        confidence = float(s.get("confidence") or 0)
+        if confidence < 0.5:
+            continue
+        tx_obj = next((t for t in unclassified if t.id == s["id"]), None)
+        if not tx_obj:
+            continue
+        if s.get("suggested_category"):
+            tx_obj.ai_suggested_category = s["suggested_category"]
+        tx_obj.ai_confidence = Decimal(str(round(confidence, 2)))
+        if confidence >= 0.75:
+            # Apply both legacy and two-level fields when high-confidence.
+            if s.get("suggested_category"):
+                try:
                     tx_obj.category = TransactionCategory(s["suggested_category"])
-                    classified += 1
+                except ValueError:
+                    pass  # legacy enum doesn't have this value yet
+            if s.get("suggested_primary"):
+                tx_obj.category_primary = s["suggested_primary"]
+            if s.get("suggested_secondary"):
+                tx_obj.subcategory = s["suggested_secondary"]
+            classified += 1
 
     await db.commit()
     return {"classified": classified, "total_unclassified": len(unclassified)}
