@@ -35,6 +35,7 @@ from ....models.budget import BudgetCategory, BudgetLineItem
 from ....models.loans_deposits import LoansDepositsTracking
 from ....models.monthly_report import MonthlyReport
 from ....models.project import Project, ProjectFinancing
+from ....models.sales import SalesContract
 from ....models.user import User
 
 router = APIRouter(tags=["loans-deposits-equity"])
@@ -176,13 +177,39 @@ async def get_loans_deposits_equity(
         )
     )).scalar() or 0)
 
-    # Required equity: post-presale value if defined, else the main one.
+    # Required equity rule (item D follow-up):
+    # The equity demand sometimes drops once the project meets the
+    # presale-condition thresholds defined on ProjectFinancing
+    # (presale_units_required + presale_amount_required). If both
+    # thresholds are met by actual SalesContract rows, switch to the
+    # post-presale equity figure. Otherwise the original demand stands.
     required = None
+    presale_met = False
+    presale_units_count = 0
+    presale_total_amount = 0.0
     if financing:
-        required = (
-            financing.equity_required_after_presale
-            or financing.equity_required_amount
-        )
+        # Count sales + sum their values across the whole project (sales
+        # are a cumulative state, not per-month).
+        sales_rows = (await db.execute(
+            select(SalesContract).where(SalesContract.project_id == project_id)
+        )).scalars().all()
+        presale_units_count = len(sales_rows)
+        presale_total_amount = sum(float(s.final_price_with_vat or 0) for s in sales_rows)
+
+        units_required = int(financing.presale_units_required or 0)
+        amount_required = float(financing.presale_amount_required or 0)
+        # Both thresholds need to be met (per the user's spec).
+        if (
+            financing.equity_required_after_presale is not None
+            and units_required > 0
+            and amount_required > 0
+            and presale_units_count >= units_required
+            and presale_total_amount >= amount_required
+        ):
+            presale_met = True
+            required = financing.equity_required_after_presale
+        else:
+            required = financing.equity_required_amount
 
     components = [
         {"label": "השקעות הון עצמי (טרם תחילת ליווי)", "amount": pre_project_total, "source": "budget+manual"},
@@ -196,6 +223,13 @@ async def get_loans_deposits_equity(
     gap = current_balance - required_f
 
     return {
+        "presale_status": {
+            "units_required": int(financing.presale_units_required or 0) if financing else 0,
+            "amount_required": float(financing.presale_amount_required or 0) if financing else 0.0,
+            "units_count": presale_units_count,
+            "total_amount": round(presale_total_amount, 2),
+            "met": presale_met,
+        },
         "as_of": snapshot.as_of.isoformat() if snapshot and snapshot.as_of else None,
         "loans": loans,
         "deposits": deposits,
