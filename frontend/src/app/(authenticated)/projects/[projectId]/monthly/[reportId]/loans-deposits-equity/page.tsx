@@ -269,6 +269,15 @@ export default function LoansDepositsEquityStep() {
                   {c.source === "manual" && (
                     <span className="text-xs text-amber-600 mr-2">— יש למלא ידנית</span>
                   )}
+                  {c.source === "bank" && (
+                    <span className="text-xs text-gray-400 mr-2">— מסיווגי תדפיס הבנק</span>
+                  )}
+                  {c.source === "budget+manual" && (
+                    <span className="text-xs text-gray-400 mr-2">— מתקציב + השקעות טרום פרויקט</span>
+                  )}
+                  {c.source === "loans" && (
+                    <span className="text-xs text-gray-400 mr-2">— מטבלת ההלוואות לעיל</span>
+                  )}
                 </td>
                 <td className="py-2.5 text-left text-sm font-medium text-gray-900 whitespace-nowrap">
                   {formatCurrency(c.amount)}

@@ -321,6 +321,18 @@ def test_bank_transaction_response_exposes_two_level_classification():
     assert "subcategory" in fields
 
 
+def test_loans_deposits_equity_aggregates_equity_subcategories():
+    """PR #13: equity composition rows must sum BankTransaction rows by
+    subcategory (equity_deposit / equity_withdrawal). Smoke-checks that
+    the constants align so the SQL query keeps using the right keys."""
+    from app.services.transaction_taxonomy import PRIMARY_SECONDARIES
+
+    deposit_secondaries = {s["key"] for s in PRIMARY_SECONDARIES.get("deposits", [])}
+    withdrawal_secondaries = {s["key"] for s in PRIMARY_SECONDARIES.get("withdrawals", [])}
+    assert "equity_deposit" in deposit_secondaries
+    assert "equity_withdrawal" in withdrawal_secondaries
+
+
 def test_loans_deposits_equity_endpoints_registered():
     """Item D: GET/PUT for /loans-deposits-equity must be on the app so the
     new monthly-report step can fetch and persist its snapshot."""
