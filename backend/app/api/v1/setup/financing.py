@@ -28,6 +28,14 @@ async def get_financing(project_id: int, user: User = Depends(get_current_user),
     return result.scalar_one_or_none()
 
 
+@router.get("/setup/financing-bodies")
+async def list_financing_bodies(user: User = Depends(get_current_user)):
+    """Catalog of banks, non-bank financiers, and insurance companies used
+    to populate the financing-body dropdown on the project setup tab."""
+    from ....services.financing_bodies import grouped_payload
+    return grouped_payload()
+
+
 @router.get("/projects/{project_id}/setup/financing/equity-summary")
 async def get_equity_summary(
     project_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),

@@ -146,6 +146,23 @@ EXTENDED_PATTERNS: dict[str, list[tuple[str, str | None, str, str | None]]] = {
         # VAT payment → withdrawals / vat_payment
         ('תשלום מע"מ', None, "withdrawals", "vat_payment"),
         ("תשלום מעמ", None, "withdrawals", "vat_payment"),
+        # Insurance companies (real names that appear in payment descriptions
+        # for builder's-risk / project insurance). Map to indirect costs;
+        # secondary is picked from the project budget items.
+        ("שלמה חברה לביטוח", "indirect_costs", "indirect_costs", None),
+        ("הפניקס חברה לביטוח", "indirect_costs", "indirect_costs", None),
+        ("הפניקס ביטוח", "indirect_costs", "indirect_costs", None),
+        ("מנורה מבטחים", "indirect_costs", "indirect_costs", None),
+        ("איילון חברה לביטוח", "indirect_costs", "indirect_costs", None),
+        ("כלל ביטוח", "indirect_costs", "indirect_costs", None),
+        ("מגדל חברה לביטוח", "indirect_costs", "indirect_costs", None),
+        ("הראל ביטוח", "indirect_costs", "indirect_costs", None),
+        # Hapoalim splits a single loan event into two lines: principal
+        # ("פירעון קרן") on one row and interest ("ריבית הלוואה") on
+        # another. Each goes to a different bucket.
+        ("פירעון קרן הלוואה", "loan_repayment", "withdrawals", "loan_repayment_senior"),
+        ("פירעון קרן", "loan_repayment", "withdrawals", "loan_repayment_senior"),
+        ("ריבית הלוואה", "interest_and_fees", "interest_fees_guarantees", "interest_and_fees"),
     ],
 }
 
