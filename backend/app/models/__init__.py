@@ -13,6 +13,7 @@ from .construction import ConstructionProgress
 from .vat import VatTracking
 from .equity import EquityTracking
 from .guarantee import GuaranteeSnapshot
+from .loans_deposits import LoansDepositsTracking
 from .profitability import ProfitabilitySnapshot
 from .sources_uses import SourcesUses
 from .payment_approval import PaymentApproval
@@ -27,7 +28,7 @@ __all__ = [
     "BankStatement", "BankTransaction",
     "BudgetTrackingSnapshot", "BudgetTrackingLine",
     "ConstructionProgress",
-    "VatTracking", "EquityTracking", "GuaranteeSnapshot",
+    "VatTracking", "EquityTracking", "GuaranteeSnapshot", "LoansDepositsTracking",
     "ProfitabilitySnapshot", "SourcesUses",
     "PaymentApproval",
 ]

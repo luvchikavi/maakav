@@ -188,6 +188,18 @@ def test_fastapi_app_imports_and_has_health_route():
     assert "/health" in routes, f"/health route missing. Routes: {sorted(p for p in routes if p)}"
 
 
+def test_loans_deposits_equity_endpoints_registered():
+    """Item D: GET/PUT for /loans-deposits-equity must be on the app so the
+    new monthly-report step can fetch and persist its snapshot."""
+    from app.main import app
+
+    paths = {(getattr(r, "path", None), tuple(sorted(getattr(r, "methods", set()) or []))) for r in app.routes}
+    target = "/api/v1/projects/{project_id}/monthly-reports/{report_id}/loans-deposits-equity"
+    methods_seen = {m for p, ms in paths if p == target for m in ms}
+    assert "GET" in methods_seen, f"GET {target} not registered. Saw: {methods_seen}"
+    assert "PUT" in methods_seen, f"PUT {target} not registered. Saw: {methods_seen}"
+
+
 def test_bulk_upload_template_endpoint_is_registered():
     """The new GET /setup/bulk-upload/template endpoint must be on the app."""
     from app.main import app

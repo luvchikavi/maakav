@@ -4,7 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
-  ArrowRight, Upload, ShoppingCart, HardHat,
+  ArrowRight, Upload, ShoppingCart, HardHat, Coins,
   Shield, ClipboardCheck, FileDown, CheckCircle2, CreditCard,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -18,12 +18,13 @@ interface DataCompleteness {
   missing_items: string[];
 }
 
-// Index + VAT are captured at report-creation time, so no standalone "מדד" step.
-// (Item D will replace the slot with "הלוואות, פקדונות והון עצמי".)
+// Index + VAT are captured at report-creation time. The slot once held by
+// "מדד" is now "הלוואות, פקדונות והון עצמי" — see item D.
 const STEPS = [
   { key: "bank-statement", label: "תדפיס בנק", icon: Upload, completenessKey: "bank_statement_uploaded" },
   { key: "sales", label: "מכירות", icon: ShoppingCart, completenessKey: null },
   { key: "construction", label: "התקדמות בנייה", icon: HardHat, completenessKey: "construction_progress_entered" },
+  { key: "loans-deposits-equity", label: "הלוואות, פקדונות והון עצמי", icon: Coins, completenessKey: null },
   { key: "guarantees", label: "ערבויות", icon: Shield, completenessKey: null },
   { key: "checks", label: "אישורי שיקים", icon: CreditCard, completenessKey: null },
   { key: "review", label: "סקירה", icon: ClipboardCheck, completenessKey: null },

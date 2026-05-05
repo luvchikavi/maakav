@@ -15,6 +15,7 @@ from app.models import (  # noqa
     MonthlyReport, BankStatement, BankTransaction, BudgetTrackingSnapshot,
     BudgetTrackingLine, ConstructionProgress, VatTracking, EquityTracking,
     GuaranteeSnapshot, ProfitabilitySnapshot, SourcesUses, PaymentApproval,
+    LoansDepositsTracking,
 )
 
 
