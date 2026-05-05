@@ -211,6 +211,7 @@ export default function ApartmentsSetupPage() {
                   <th className="text-right px-4 py-3 font-medium">בעלות</th>
                   <th className="text-right px-4 py-3 font-medium">סטטוס / בעלים</th>
                   <th className="text-left px-4 py-3 font-medium">שווי כולל מע&quot;מ</th>
+                  <th className="text-left px-4 py-3 font-medium">שווי ללא מע&quot;מ</th>
                   <th className="px-4 py-3 w-10" />
                 </tr>
               </thead>
@@ -238,6 +239,9 @@ export default function ApartmentsSetupPage() {
                     </td>
                     <td className="px-4 py-3 text-left font-medium text-gray-900">
                       {apt.list_price_with_vat ? formatCurrency(Number(apt.list_price_with_vat)) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-left text-gray-500">
+                      {apt.list_price_no_vat ? formatCurrency(Number(apt.list_price_no_vat)) : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <button onClick={() => handleDelete(apt.id)} className="text-gray-300 hover:text-red-500 transition">

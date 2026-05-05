@@ -47,6 +47,16 @@ export default function BudgetSetupPage() {
     queryFn: async () => (await api.get(`/projects/${projectId}/setup/budget`)).data,
   });
 
+  // For computing the paired "כולל מע״מ" column. Uses the latest monthly
+  // report's VAT rate; falls back to 0.18 (current Israeli rate) when no
+  // reports exist yet (still in setup phase).
+  const { data: reports = [] } = useQuery<{ vat_rate: number }[]>({
+    queryKey: ["monthly-reports", projectId],
+    queryFn: async () => (await api.get(`/projects/${projectId}/monthly-reports`)).data,
+    staleTime: 1000 * 60 * 5,
+  });
+  const vatMultiplier = 1 + (Number(reports[0]?.vat_rate) || 0.18);
+
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.match(/\.xlsx?$/i)) {
       alert("נדרש קובץ Excel (.xlsx)");
@@ -165,6 +175,7 @@ export default function BudgetSetupPage() {
                     <th className="text-right px-4 py-2 font-medium">סעיף</th>
                     <th className="text-right px-4 py-2 font-medium">ספק</th>
                     <th className="text-left px-6 py-2 font-medium">עלות ללא מע&quot;מ</th>
+                    <th className="text-left px-6 py-2 font-medium">עלות כולל מע&quot;מ</th>
                     <th className="text-center px-4 py-2 font-medium">צמוד</th>
                   </tr>
                 </thead>
@@ -176,6 +187,9 @@ export default function BudgetSetupPage() {
                       <td className="px-4 py-3 text-sm text-gray-500">{item.supplier_name || "—"}</td>
                       <td className="px-6 py-3 text-sm text-gray-900 text-left font-medium">
                         {formatCurrency(Number(item.cost_no_vat))}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-500 text-left">
+                        {formatCurrency(Number(item.cost_no_vat) * vatMultiplier)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`text-xs ${item.is_index_linked ? "text-green-600" : "text-gray-400"}`}>
