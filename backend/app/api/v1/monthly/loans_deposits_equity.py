@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....core.dependencies import get_current_user
 from ....database import get_db
+from ....models.bank_statement import BankTransaction, TransactionType
 from ....models.budget import BudgetCategory, BudgetLineItem
 from ....models.loans_deposits import LoansDepositsTracking
 from ....models.monthly_report import MonthlyReport
@@ -153,6 +154,28 @@ async def get_loans_deposits_equity(
         if it.get("kind") == "mezzanine"
     )
 
+    # Item A introduces a `subcategory` on every BankTransaction. Sum
+    # equity-related deposits and withdrawals for THIS report so the
+    # equity composition lines that used to be manual now feed
+    # themselves. Withdrawals are returned as a positive number that the
+    # frontend renders with a (parens) negative.
+    period_equity_deposits = float((await db.execute(
+        select(func.coalesce(func.sum(BankTransaction.amount), 0))
+        .where(
+            BankTransaction.monthly_report_id == report_id,
+            BankTransaction.transaction_type == TransactionType.CREDIT,
+            BankTransaction.subcategory == "equity_deposit",
+        )
+    )).scalar() or 0)
+    period_equity_withdrawals = float((await db.execute(
+        select(func.coalesce(func.sum(BankTransaction.amount), 0))
+        .where(
+            BankTransaction.monthly_report_id == report_id,
+            BankTransaction.transaction_type == TransactionType.DEBIT,
+            BankTransaction.subcategory == "equity_withdrawal",
+        )
+    )).scalar() or 0)
+
     # Required equity: post-presale value if defined, else the main one.
     required = None
     if financing:
@@ -163,9 +186,10 @@ async def get_loans_deposits_equity(
 
     components = [
         {"label": "השקעות הון עצמי (טרם תחילת ליווי)", "amount": pre_project_total, "source": "budget+manual"},
-        {"label": "הפקדות הון עצמי בחשבון הליווי", "amount": 0.0, "source": "manual"},
+        {"label": "הפקדות הון עצמי בחשבון הליווי", "amount": period_equity_deposits, "source": "bank"},
         {"label": "הלוואות מזנין", "amount": mezzanine_total, "source": "loans"},
-        {"label": "משיכות הון עצמי בחשבון הליווי", "amount": 0.0, "source": "manual"},
+        # Stored as positive but subtracted into the total below.
+        {"label": "משיכות הון עצמי בחשבון הליווי", "amount": -period_equity_withdrawals, "source": "bank"},
     ]
     current_balance = sum(c["amount"] for c in components)
     required_f = float(required) if required is not None else 0.0
