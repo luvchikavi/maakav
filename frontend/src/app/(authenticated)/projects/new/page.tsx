@@ -5,15 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import api from "@/lib/api";
 
-const BANKS = [
-  { value: "leumi", label: "בנק לאומי" },
-  { value: "hapoalim", label: "בנק הפועלים" },
-  { value: "discount", label: "בנק דיסקונט" },
-  { value: "mizrahi", label: "בנק מזרחי טפחות" },
-  { value: "international", label: "הבנק הבינלאומי" },
-  { value: "jerusalem", label: "בנק ירושלים" },
-  { value: "other", label: "אחר" },
-];
+// Bank / financing body is captured on the project's financing-setup tab.
+// Removed from this form to avoid duplicate input.
 
 const ISRAELI_CITIES = [
   "ירושלים", "תל אביב-יפו", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד", "נתניה",
@@ -49,8 +42,6 @@ export default function NewProjectPage() {
     address: "",
     city: "",
     developer_name: "",
-    bank: "",
-    project_account_number: "",
     project_type: "",
   });
 
@@ -100,12 +91,8 @@ export default function NewProjectPage() {
         </div>
         <Field label="שם היזם" value={form.developer_name} onChange={(v) => set("developer_name", v)} placeholder='נווה שוסטר בע"מ' />
 
-        <div className="grid grid-cols-2 gap-4">
-          <SelectField label="סוג פרויקט" value={form.project_type} onChange={(v) => set("project_type", v)} options={PROJECT_TYPES} />
-          <SelectField label="בנק מלווה" value={form.bank} onChange={(v) => set("bank", v)} options={BANKS} />
-        </div>
-
-        <Field label="מספר חשבון" value={form.project_account_number} onChange={(v) => set("project_account_number", v)} placeholder="767-220100/80" dir="ltr" />
+        <SelectField label="סוג פרויקט" value={form.project_type} onChange={(v) => set("project_type", v)} options={PROJECT_TYPES} />
+        {/* Bank / financing-body is set on the financing setup tab — no need to pick it twice. */}
 
         <button
           type="submit"

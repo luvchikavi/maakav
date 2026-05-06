@@ -58,13 +58,18 @@ async def _verify(project_id: int, report_id: int, firm_id: int, db: AsyncSessio
 
 
 def _seed_from_financing(financing: ProjectFinancing | None) -> tuple[list, list]:
-    """Build initial loans/deposits arrays from the project's setup data."""
+    """Build initial loans/deposits arrays from the project's setup data.
+
+    Reads the JSON columns added by bulk_upload/confirm. Tolerates the
+    fields being absent on the SQLAlchemy model (e.g. on old deployments
+    where the columns hadn't been added yet) via getattr.
+    """
     loans: list = []
     deposits: list = []
     if not financing:
         return loans, deposits
 
-    for entry in financing.senior_loans or []:
+    for entry in (getattr(financing, "senior_loans", None) or []):
         loans.append({
             "label": "הלוואת חוב בכיר",
             "kind": "senior",
@@ -72,7 +77,7 @@ def _seed_from_financing(financing: ProjectFinancing | None) -> tuple[list, list
             "current_balance": float(entry.get("balance") or 0),
             "prev_month": None,
         })
-    for entry in financing.subordinated_loans or []:
+    for entry in (getattr(financing, "subordinated_loans", None) or []):
         loans.append({
             "label": "הלוואת מזניין/חוב נחות",
             "kind": "mezzanine",
@@ -80,7 +85,7 @@ def _seed_from_financing(financing: ProjectFinancing | None) -> tuple[list, list
             "current_balance": float(entry.get("balance") or 0),
             "prev_month": None,
         })
-    for entry in financing.deposits or []:
+    for entry in (getattr(financing, "deposits", None) or []):
         deposits.append({
             "label": 'פיקדון פק"מ',
             "principal": float(entry.get("principal") or 0),

@@ -33,6 +33,9 @@ async def init_db():
             "ALTER TABLE budget_line_items ADD COLUMN IF NOT EXISTS equity_investment NUMERIC(15, 2)",
             "ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS category_primary VARCHAR(60)",
             "ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS subcategory VARCHAR(120)",
+            "ALTER TABLE project_financing ADD COLUMN IF NOT EXISTS senior_loans JSON",
+            "ALTER TABLE project_financing ADD COLUMN IF NOT EXISTS subordinated_loans JSON",
+            "ALTER TABLE project_financing ADD COLUMN IF NOT EXISTS deposits JSON",
         ]
         for stmt in column_additions:
             try:

@@ -321,6 +321,18 @@ def test_bank_transaction_response_exposes_two_level_classification():
     assert "subcategory" in fields
 
 
+def test_project_financing_exposes_loan_deposit_arrays():
+    """Hotfix: loans-deposits-equity endpoint references
+    ProjectFinancing.senior_loans / subordinated_loans / deposits. Prod
+    was 500-ing because these columns were assumed but never declared
+    on the ORM model. Pin them so a regression can't slip through CI."""
+    from app.models.project import ProjectFinancing
+
+    cols = {c.name for c in ProjectFinancing.__table__.columns}
+    for required in ("senior_loans", "subordinated_loans", "deposits"):
+        assert required in cols, f"ProjectFinancing missing {required!r}"
+
+
 def test_loans_deposits_equity_endpoint_returns_presale_status():
     """PR #14: presale_status must be in the response so the UI can show
     whether the auto-flip rule fired (units met + amount met → switches

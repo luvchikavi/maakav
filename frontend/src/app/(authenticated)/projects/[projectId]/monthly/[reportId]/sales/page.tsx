@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -237,13 +237,19 @@ function SaleFormModal({
   onSuccess: () => void;
   vatRate: number;
 }) {
-  const vatMultiplier = 1 + vatRate;
   const [aptId, setAptId] = useState("");
   const [buyerName, setBuyerName] = useState("");
   const [buyerId, setBuyerId] = useState("");
   const [contractDate, setContractDate] = useState("");
   const [priceWithVat, setPriceWithVat] = useState("");
   const [priceNoVat, setPriceNoVat] = useState("");
+  // VAT rate captured at sale time. Pre-filled from the report's vat_rate
+  // but the user can override per-sale before submission. Stored as the
+  // fractional rate (0.18 for 18%).
+  const [saleVatRate, setSaleVatRate] = useState<number>(vatRate);
+  // Re-sync if the report query loads after the modal mounted.
+  useEffect(() => { setSaleVatRate(vatRate); }, [vatRate]);
+  const vatMultiplier = 1 + saleVatRate;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -275,9 +281,16 @@ function SaleFormModal({
   };
 
   const handleSubmit = async () => {
-    if (!aptId || !buyerName || !contractDate || !priceWithVat || !priceNoVat) {
-      setError("יש למלא את כל השדות");
-      return;
+    // Specific validation messages so the user can see exactly which field
+    // the form thinks is empty (was previously "fill all fields" with no hint).
+    if (!aptId) { setError("יש לבחור דירה"); return; }
+    if (!buyerName.trim()) { setError("יש למלא שם קונה"); return; }
+    if (!contractDate) { setError("יש לבחור תאריך חוזה"); return; }
+    if (!priceWithVat || Number(priceWithVat) <= 0) {
+      setError('יש להזין מחיר חוזה כולל מע"מ'); return;
+    }
+    if (!priceNoVat || Number(priceNoVat) <= 0) {
+      setError('יש להזין מחיר חוזה ללא מע"מ'); return;
     }
     setSaving(true);
     setError("");
@@ -290,7 +303,7 @@ function SaleFormModal({
         original_price_with_vat: selectedApt?.list_price_with_vat || Number(priceWithVat),
         final_price_with_vat: Number(priceWithVat),
         final_price_no_vat: Number(priceNoVat),
-        vat_rate: vatRate,
+        vat_rate: saleVatRate,
       });
       onSuccess();
     } catch (err: any) {
@@ -373,6 +386,37 @@ function SaleFormModal({
               <span className="text-sm font-bold text-gray-700">{formatCurrency(selectedApt.list_price_with_vat)}</span>
             </div>
           )}
+          {/* VAT at sale time — pre-filled from monthly report. User can override per-sale. */}
+          <div className="bg-gray-50 rounded-xl p-3 mb-3 border border-gray-100">
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              מע״מ במועד רכישת הדירה
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.5"
+                value={String(saleVatRate * 100)}
+                onChange={(e) => {
+                  const pct = Number(e.target.value);
+                  if (!isNaN(pct) && pct >= 0 && pct <= 100) {
+                    const newRate = pct / 100;
+                    setSaleVatRate(newRate);
+                    // Re-derive no-VAT side from with-VAT to stay consistent.
+                    if (priceWithVat && !isNaN(Number(priceWithVat))) {
+                      setPriceNoVat(String(Math.round(Number(priceWithVat) / (1 + newRate))));
+                    }
+                  }
+                }}
+                dir="ltr"
+                className="w-20 px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <span className="text-sm text-gray-500">%</span>
+              <span className="text-xs text-gray-400 mr-auto">
+                ערך ברירת מחדל מהדוח החודשי. שנה במידה והשתנה במועד הרכישה.
+              </span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">מחיר חוזה כולל מע&quot;מ</label>
