@@ -221,10 +221,10 @@ async def confirm_bulk_upload(
                 ))
             saved["guarantees"] = len(guarantees)
 
-    # ── 4. Financing — update project financing ──────────────
+    # ── 4. Financing — update project + persist loan/deposit arrays ──
 
     financing = body.get("financing")
-    if financing and financing.get("account_number"):
+    if financing and (financing.get("account_number") or financing.get("senior_loans")):
         project = (await db.execute(
             select(Project).where(Project.id == project_id)
         )).scalar_one()
@@ -233,6 +233,20 @@ async def confirm_bulk_upload(
             project.project_account_number = str(financing["account_number"])
         if financing.get("branch"):
             project.bank_branch = str(financing["branch"])
+
+        # Persist senior_loans / subordinated_loans / deposits arrays onto
+        # ProjectFinancing so the loans-deposits-equity tab can pre-fill
+        # from them on the first monthly report.
+        from ....models.project import ProjectFinancing
+        fin_row = (await db.execute(
+            select(ProjectFinancing).where(ProjectFinancing.project_id == project_id)
+        )).scalar_one_or_none()
+        if fin_row is None:
+            fin_row = ProjectFinancing(project_id=project_id)
+            db.add(fin_row)
+        fin_row.senior_loans = financing.get("senior_loans") or []
+        fin_row.subordinated_loans = financing.get("subordinated_loans") or []
+        fin_row.deposits = financing.get("deposits") or []
 
         saved["financing_updated"] = True
 

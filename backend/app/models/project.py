@@ -100,6 +100,12 @@ class ProjectFinancing(Base):
     equity_required_after_presale: Mapped[Decimal | None] = mapped_column(Numeric(15, 2))
     interest_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     guarantee_fee_percent: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    # Initial-state arrays parsed from the "חשבון ליווי סגור" tab of the
+    # bulk-upload Excel. Each entry: {date, principal, balance}. Used as
+    # the starting snapshot for the first monthly report's loans/deposits.
+    senior_loans: Mapped[list | None] = mapped_column(JSON)
+    subordinated_loans: Mapped[list | None] = mapped_column(JSON)
+    deposits: Mapped[list | None] = mapped_column(JSON)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
