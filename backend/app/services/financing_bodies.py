@@ -31,7 +31,7 @@ FINANCING_BODIES: list[FinancingBody] = [
     {"key": "ardamor", "label": "ארדמייר", "kind": "non_bank"},
     {"key": "yesodot", "label": "יסודות", "kind": "non_bank"},
     {"key": "building_capital", "label": "בילדינג קפיטל", "kind": "non_bank"},
-    {"key": "phoenix_shalvu", "label": "הפניקס שלוו", "kind": "non_bank"},
+    {"key": "phoenix_capital", "label": "הפניקס", "kind": "non_bank"},
     # ── Insurance companies (חברות ביטוח) ────────────────────
     {"key": "clal", "label": "כלל", "kind": "insurance"},
     {"key": "phoenix", "label": "הפניקס", "kind": "insurance"},
